@@ -60,10 +60,11 @@ export function ContactForm() {
 
     setStatus("sending");
     try {
+      const website = new FormData(event.currentTarget).get("website");
       const response = await fetch("/api/contact", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(fields),
+        body: JSON.stringify({ ...fields, website: typeof website === "string" ? website : "" }),
       });
       const result = (await response.json()) as { message?: string; error?: string };
       if (!response.ok) throw new Error(result.error || "The message could not be sent.");
@@ -79,6 +80,10 @@ export function ContactForm() {
 
   return (
     <form className="contact-form" onSubmit={handleSubmit} noValidate>
+      <div className="form-honeypot" aria-hidden="true">
+        <label htmlFor="contact-website">Leave this field empty</label>
+        <input id="contact-website" name="website" tabIndex={-1} autoComplete="off" />
+      </div>
       <div className="contact-form-fields">
         <div className="form-field">
           <label htmlFor="contact-name">Name <span aria-hidden="true">*</span></label>

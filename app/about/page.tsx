@@ -6,16 +6,20 @@ import { Footer } from "@/components/site/Footer";
 import { Header } from "@/components/site/Header";
 import { Reveal } from "@/components/site/Reveal";
 import { SectionHeading } from "@/components/site/SectionHeading";
-import { site, thinkingPrinciples } from "@/content/site";
 import { createPageMetadata } from "@/lib/metadata";
+import { applyPublishedSeo } from "@/lib/server/content/metadata";
+import { getPublishedPage, getPublishedSettings, getSection } from "@/lib/server/content/public";
 
-export const metadata: Metadata = createPageMetadata({
-  title: "About Faisal Hossen",
-  description: "About Faisal Hossen’s practical, independent approach to web development, product thinking, UX, AI, automation, and SEO.",
-  path: "/about",
-});
+export async function generateMetadata(): Promise<Metadata> {
+  const fallback = createPageMetadata({ title: "About Faisal Hossen", description: "About Faisal Hossen’s practical, independent approach to web development, product thinking, UX, AI, automation, and SEO.", path: "/about" });
+  return applyPublishedSeo("/about", fallback);
+}
 
-export default function AboutPage() {
+export default async function AboutPage() {
+  const [settings, page] = await Promise.all([getPublishedSettings(), getPublishedPage("/about")]);
+  const { site, thinkingPrinciples } = settings;
+  const hero = getSection(page, "hero");
+  const pointOfView = getSection(page, "point-of-view");
   return (
     <>
       <Header />
@@ -23,8 +27,8 @@ export default function AboutPage() {
         <section className="section-shell page-hero about-hero">
           <Reveal>
             <p className="eyebrow"><span className="status-dot" aria-hidden="true" /> About / how the work is shaped</p>
-            <h1>Digital work should feel considered before it feels complicated.</h1>
-            <p className="page-hero-supporting">I&apos;m an independent digital problem solver who combines web development, product thinking, UX, AI, automation, and SEO to make the next useful step clearer.</p>
+            <h1>{typeof hero.heading === "string" ? hero.heading : "Digital work should feel considered before it feels complicated."}</h1>
+            <p className="page-hero-supporting">{typeof hero.supporting === "string" ? hero.supporting : "I'm an independent digital problem solver who combines web development, product thinking, UX, AI, automation, and SEO to make the next useful step clearer."}</p>
           </Reveal>
         </section>
 
@@ -35,7 +39,7 @@ export default function AboutPage() {
           </div>
           <div className="about-story-copy">
             <Reveal>
-              <SectionHeading eyebrow="The point of view" title="Start with the problem, not the platform." body={site.supporting} />
+              <SectionHeading eyebrow="The point of view" title={typeof pointOfView.heading === "string" ? pointOfView.heading : "Start with the problem, not the platform."} body={typeof pointOfView.supporting === "string" ? pointOfView.supporting : site.supporting} />
             </Reveal>
             <Reveal delay={0.08}>
               <div className="about-copy-stack">

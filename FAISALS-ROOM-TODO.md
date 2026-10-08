@@ -1,19 +1,19 @@
 # Faisal's Room — Implementation TODO
 
-**Status:** Awaiting user approval. Do not implement any item until the master `plan.md` is approved.
+**Status:** Phase 1 implementation is complete in source. Database-backed acceptance remains pending deployment configuration and review. Phase 2 and Phase 3 have not been started.
 
 ## Phase 1 — Foundation: secure Control Center and content publishing
 
-- [ ] Create the private `/faisals-room` shell and the exact route family: `/login`, `/pages`, `/projects`, `/media`, `/seo`, `/leads`, `/analytics`, `/navigation`, `/settings`, `/system`; do not create or use `/admin`.
-- [ ] Preserve the public website as the primary experience and keep the current evidence-first content, project claims, identity imagery, SEO behavior, accessibility rules, and responsive design intact.
-- [ ] Implement a single-owner account with secure password hashing, protected routes, expiring/revocable sessions, logout, password change, owner authorization on every mutation, login throttling, brute-force protection, CSRF/origin checks, safe errors, and secure cookies.
-- [ ] Add database migrations, environment validation, typed repositories/services, transaction boundaries, and seed data from the current verified `content/site.ts`, `content/projects.ts`, project JSON source, navigation, settings, and media metadata.
-- [ ] Add database-backed site settings, pages, page sections, projects, project media relationships, navigation items, SEO foundation records, contact submissions, revisions, and activity logs.
-- [ ] Add draft, protected preview, publish, and restore-as-new-revision behavior; public routes must read published data only and must retain a safe file-backed fallback until database parity is proven.
-- [ ] Add a media library with safe image upload validation, storage keys, checksums, dimensions, derivatives, alt text, focal/crop metadata, usage references, archive/delete rules, and no dangerous arbitrary-file handling.
-- [ ] Change contact handling so the submission is durably stored before optional Resend notification; expose honest stored/delivery/error states without exposing secrets or inventing an email address.
-- [ ] Build intentional desktop/mobile dashboard UX with dark sidebar/light workspace, editorial hierarchy, accessible forms, loading/empty/error states, touch-safe controls, and no generic admin-template styling.
-- [ ] Test migration/seed parity, auth/session/authorization, publish/preview/restore, media validation, contact persistence, public route regression, accessibility, reduced motion, keyboard navigation, and required responsive widths.
+- [x] Create the private `/faisals-room` shell and the exact route family: `/login`, `/pages`, `/projects`, `/media`, `/seo`, `/leads`, `/analytics`, `/navigation`, `/settings`, `/system`; do not create or use `/admin`.
+- [x] Preserve the public website as the primary experience and keep the current evidence-first content, project claims, identity imagery, SEO behavior, accessibility rules, and responsive design intact; database reads remain opt-in and fall back to verified file content.
+- [x] Implement a single-owner account with Argon2id, protected routes, expiring/revocable sessions, logout, password change, owner authorization on every mutation, login throttling, lockout, CSRF/origin checks, safe errors, and secure cookies.
+- [x] Add database migrations, environment validation, typed repositories/services, transaction boundaries, idempotent seed data from verified site/project sources, navigation, settings, and media metadata.
+- [x] Add database-backed site settings, pages, page sections, projects, project media relationships, navigation items, SEO foundation records, contact submissions, revisions, and activity logs.
+- [x] Add draft, protected preview, explicit publish, immutable snapshots, and restore-as-new-draft behavior; public reads remain on checked-in files until explicitly switched after parity review.
+- [x] Add private image upload validation, checksums/dimensions, WebP derivatives, alt/focal metadata, usage references, safe archive rules, and filesystem storage outside the public web root.
+- [x] Store contacts durably before optional Resend notification and expose honest storage/delivery states without adding an unverified email address.
+- [x] Build the responsive dark-sidebar/light-workspace product UI with accessible forms, empty/error states, and no decorative analytics.
+- [ ] Complete migration/seed parity and authenticated workflow tests against the production-equivalent PostgreSQL/storage configuration; finish deployment browser/accessibility review at approved viewports.
 
 ## Phase 2 — Intelligence: SEO, Analytics, Leads, Health, and redirects
 
@@ -42,7 +42,7 @@
 
 ## Approval gates
 
-- [ ] User reviews and explicitly approves `plan.md` before any Phase 1 implementation.
+- [x] User directly approved Phase 1 implementation on 2026-10-08; Phases 2 and 3 remain out of scope.
 - [ ] Phase 1 is accepted only after public regression, database parity, security evidence, and recovery baseline review.
 - [ ] Phase 2 requires separate approval for Google API ownership/scopes and privacy/consent decisions.
 - [ ] Phase 3 requires evidence that the operating burden and real usage justify automation and future modules.

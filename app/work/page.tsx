@@ -4,29 +4,25 @@ import { Footer } from "@/components/site/Footer";
 import { Header } from "@/components/site/Header";
 import { ProjectGrid } from "@/components/site/ProjectGrid";
 import { Reveal } from "@/components/site/Reveal";
-import { projects } from "@/content/projects";
 import { createPageMetadata } from "@/lib/metadata";
+import { getPublishedPage, getPublishedProjects, getSection } from "@/lib/server/content/public";
+import { applyPublishedSeo } from "@/lib/server/content/metadata";
 
-export const metadata: Metadata = createPageMetadata({
-  title: "Selected Work",
-  description: "A selection of verified project notes covering web experiences, reusable systems, and interactive product work.",
-  path: "/work",
-});
+export async function generateMetadata(): Promise<Metadata> {
+  const fallback = createPageMetadata({ title: "Selected Work", description: "A selection of verified project notes covering web experiences, reusable systems, and interactive product work.", path: "/work" });
+  return applyPublishedSeo("/work", fallback);
+}
 
-const structuredData = {
-  "@context": "https://schema.org",
-  "@type": "CollectionPage",
-  name: "Selected Work — Faisal Hossen",
-  description: "A selection of verified project notes covering web experiences, reusable systems, and interactive product work.",
-  hasPart: projects.map((project) => ({
-    "@type": "CreativeWork",
-    name: project.title,
-    description: project.summary,
-    url: `/work/${project.slug}`,
-  })),
-};
-
-export default function WorkPage() {
+export default async function WorkPage() {
+  const [projects, page] = await Promise.all([getPublishedProjects(), getPublishedPage("/work")]);
+  const hero = getSection(page, "hero");
+  const structuredData = {
+    "@context": "https://schema.org",
+    "@type": "CollectionPage",
+    name: "Selected Work — Faisal Hossen",
+    description: "A selection of verified project notes covering web experiences, reusable systems, and interactive product work.",
+    hasPart: projects.map((project) => ({ "@type": "CreativeWork", name: project.title, description: project.summary, url: `/work/${project.slug}` })),
+  };
   return (
     <>
       <Header />
@@ -34,8 +30,8 @@ export default function WorkPage() {
         <section className="section-shell page-hero">
           <Reveal>
             <p className="eyebrow"><span className="status-dot" aria-hidden="true" /> Selected work / project notes</p>
-            <h1>A few problems I&apos;ve helped make clearer.</h1>
-            <p className="page-hero-supporting">Three project stories from the available source material. No invented numbers, testimonials, or outcomes — just the problem, the implementation, and the experience it was designed to create.</p>
+            <h1>{typeof hero.heading === "string" ? hero.heading : "A few problems I've helped make clearer."}</h1>
+            <p className="page-hero-supporting">{typeof hero.supporting === "string" ? hero.supporting : "Three project stories from the available source material. No invented numbers, testimonials, or outcomes — just the problem, the implementation, and the experience it was designed to create."}</p>
           </Reveal>
         </section>
         <section className="section-shell work-index-section" aria-labelledby="work-index-title">

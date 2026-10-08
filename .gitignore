@@ -10,3 +10,4 @@ out/
 tscache/
 *.tsbuildinfo
 release-screenshots/
+/var/

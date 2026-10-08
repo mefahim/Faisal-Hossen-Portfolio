@@ -2,9 +2,10 @@
 
 import { ArrowRight, Check, CircleDot } from "lucide-react";
 import { useState } from "react";
-import { problemStates } from "@/content/site";
+import { problemStates as fileProblemStates } from "@/content/site";
+import type { PublicSettings } from "@/lib/server/content/public";
 
-export function ProblemPlayground() {
+export function ProblemPlayground({ problemStates = fileProblemStates }: { problemStates?: PublicSettings["problemStates"] }) {
   const [selectedId, setSelectedId] = useState(problemStates[0].id);
   const selected = problemStates.find((problem) => problem.id === selectedId) ?? problemStates[0];
 

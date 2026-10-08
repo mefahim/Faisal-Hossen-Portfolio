@@ -1,7 +1,8 @@
 import { ArrowUpRight } from "lucide-react";
-import { capabilities } from "@/content/site";
+import { capabilities as fileCapabilities } from "@/content/site";
+import type { PublicSettings } from "@/lib/server/content/public";
 
-export function CapabilityList() {
+export function CapabilityList({ capabilities = fileCapabilities }: { capabilities?: PublicSettings["capabilities"] }) {
   return (
     <div className="capability-list" aria-label="Faisal Hossen capabilities">
       {capabilities.map((capability) => (

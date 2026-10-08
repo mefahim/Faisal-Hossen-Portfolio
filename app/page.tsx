@@ -8,28 +8,26 @@ import { ProjectGrid } from "@/components/site/ProjectGrid";
 import { Reveal } from "@/components/site/Reveal";
 import { SectionHeading } from "@/components/site/SectionHeading";
 import { Workbench } from "@/components/site/Workbench";
-import { projects } from "@/content/projects";
-import { contactDetails, site, thinkingPrinciples } from "@/content/site";
+import { getPublishedPage, getPublishedProjects, getPublishedSettings, getSection } from "@/lib/server/content/public";
+import { siteMetadata } from "@/lib/metadata";
+import { applyPublishedSeo } from "@/lib/server/content/metadata";
 
-const structuredData = {
-  "@context": "https://schema.org",
-  "@graph": [
-    {
-      "@type": "Person",
-      name: "Faisal Hossen",
-      jobTitle: "Independent Web Developer",
-      description: site.supporting,
-      knowsAbout: site.capabilities,
-    },
-    {
-      "@type": "WebSite",
-      name: "Faisal Hossen — Digital Problem Solver",
-      description: site.supporting,
-    },
-  ],
-};
+export async function generateMetadata() {
+  return applyPublishedSeo("/", siteMetadata);
+}
 
-export default function HomePage() {
+export default async function HomePage() {
+  const [settings, projects, page] = await Promise.all([getPublishedSettings(), getPublishedProjects(), getPublishedPage("/")]);
+  const { site, contactDetails, thinkingPrinciples } = settings;
+  const hero = getSection(page, "hero");
+  const selectedWork = getSection(page, "selected-work");
+  const structuredData = {
+    "@context": "https://schema.org",
+    "@graph": [
+      { "@type": "Person", name: site.name, jobTitle: site.label, description: site.supporting, knowsAbout: site.capabilities },
+      { "@type": "WebSite", name: `${site.name} — Digital Problem Solver`, description: site.supporting },
+    ],
+  };
   return (
     <>
       <Header />
@@ -37,13 +35,13 @@ export default function HomePage() {
         <section className="hero section-shell">
           <div className="hero-copy">
             <Reveal>
-              <p className="eyebrow hero-eyebrow"><span className="status-dot" aria-hidden="true" /> {site.label} · {site.context}</p>
+              <p className="eyebrow hero-eyebrow"><span className="status-dot" aria-hidden="true" /> {typeof hero.eyebrow === "string" ? hero.eyebrow : `${site.label} · ${site.context}`}</p>
             </Reveal>
             <Reveal delay={0.05}>
-              <h1>{site.positioning}</h1>
+              <h1>{typeof hero.heading === "string" ? hero.heading : site.positioning}</h1>
             </Reveal>
             <Reveal delay={0.1}>
-              <p className="hero-supporting">{site.supporting}</p>
+              <p className="hero-supporting">{typeof hero.supporting === "string" ? hero.supporting : site.supporting}</p>
             </Reveal>
             <Reveal delay={0.15}>
               <div className="hero-actions">
@@ -113,7 +111,7 @@ export default function HomePage() {
                 body="The tools change. The standard stays the same: make the right thing clearer, calmer, and easier to use."
               />
             </Reveal>
-            <Reveal delay={0.08}><CapabilityList /></Reveal>
+            <Reveal delay={0.08}><CapabilityList capabilities={settings.capabilities} /></Reveal>
           </div>
         </section>
 
@@ -125,7 +123,7 @@ export default function HomePage() {
               <p>Choose the situation that sounds familiar. You will get a useful first question, not a quiz score.</p>
             </Reveal>
           </div>
-          <Reveal delay={0.08} className="playground-wrap"><ProblemPlayground /></Reveal>
+          <Reveal delay={0.08} className="playground-wrap"><ProblemPlayground problemStates={settings.problemStates} /></Reveal>
         </section>
 
         <section className="section-shell thinking-section" aria-labelledby="thinking-title">
@@ -166,8 +164,8 @@ export default function HomePage() {
             <Reveal>
               <SectionHeading
                 eyebrow="Project notes"
-                title="Useful work, in three different shapes."
-                body="A flooring website, a therapist experience, and an AI product flow. Start with the case study that feels closest to the problem in front of you."
+                title={typeof selectedWork.title === "string" ? selectedWork.title : "Useful work, in three different shapes."}
+                body={typeof selectedWork.body === "string" ? selectedWork.body : "A flooring website, a therapist experience, and an AI product flow. Start with the case study that feels closest to the problem in front of you."}
               />
             </Reveal>
             <Reveal delay={0.08}><ProjectGrid projects={projects} className="home-project-grid" /></Reveal>

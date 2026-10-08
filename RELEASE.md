@@ -1,79 +1,87 @@
-# Faisal Hossen Portfolio — Hosting Release
+# Faisal Hossen Portfolio — Release and Faisal’s Room Runbook
 
-**Release:** Final UI Refinement  
-**Application:** Next.js App Router portfolio  
-**Runtime:** Node.js 22+ with pnpm  
-**Server requirement:** Enabled because `/api/contact` is a server route  
-**Database:** Not required
+**Application:** Next.js App Router portfolio with the Phase 1 single-owner Faisal’s Room foundation
+**Runtime:** Node.js 22+ and pnpm 11
+**Hosting baseline:** Existing Hostinger LiteSpeed Passenger deployment
+**Public content source at release:** checked-in TypeScript files (`CONTENT_SOURCE=files`)
+**Private route:** `/faisals-room` (never `/admin`)
 
-## Hostinger LiteSpeed deployment
+## Phase boundary
 
-The production build is configured with `output: "standalone"` in `next.config.ts`, so it can run behind Hostinger LiteSpeed Passenger on Node.js 22. The deployed process uses the generated `.next/standalone/server.js`, copies `.next/static` and `public`, and serves through the domain’s Passenger `.htaccess` mapping. A timestamped backup of the previous `public_html` was created before the first deployment.
+This release contains **Phase 1 only**: private access, content drafts/publishing, media metadata/upload, durable leads, revisions, activity history, and migration-safe public reads. GA4/Search Console data, audit scoring, redirects, advanced leads, scheduled jobs, backups, monitoring, and future modules are **not implemented**. Do not start Phase 2 or Phase 3 without separate approval.
 
-## Deploy
+## Hosting and runtime
 
-Use the repository root as the hosting project directory. Install dependencies, build the application, and run the Next.js server:
+The project retains `output: "standalone"`. Run the generated `.next/standalone/server.js` entrypoint through `pnpm start` (not `next start`); it listens on the host-provided `PORT`. Copy `public/` and `.next/static/` into the standalone tree after each build as shown below. Keep private media in durable storage outside `public/` and outside any release directory that is replaced during deploy. This release uses the configured server filesystem path; it is not an object-storage integration. If the hosting account cannot provide a durable private path, provision an appropriate storage adapter before accepting uploads in production.
+
+Install and build:
 
 ```bash
 pnpm install --frozen-lockfile
+pnpm typecheck
+pnpm test
 pnpm build
-pnpm start
+mkdir -p .next/standalone/.next
+cp -a public .next/standalone/
+cp -a .next/static .next/standalone/.next/
+PORT=3000 pnpm start
 ```
 
-The process must listen on the hosting provider’s `PORT` value. The existing `next start` script uses the standard Next.js runtime and serves the static pages plus `/api/contact`.
+For Passenger, deploy `.next/standalone/` after the two copy operations, preserve the database and media paths across releases, and set the process working directory/environment correctly. Passenger supplies its own `PORT`; the local command above demonstrates only a fallback test. Follow the hosting provider’s deployment process; do not commit production secrets.
 
-## Required environment configuration
+## Required production inputs
 
-Set these variables in the hosting provider’s secret/environment settings, never in committed source:
+Set these in the hosting provider’s protected environment/secrets manager:
 
-```text
-RESEND_API_KEY=...
-CONTACT_EMAIL=...
-CONTACT_FROM_EMAIL=...
-```
+| Variable | Required | Purpose |
+| --- | --- | --- |
+| `NEXT_PUBLIC_SITE_URL` | Yes for production SEO | Verified public origin used for canonical, sitemap, and social metadata. |
+| `DATABASE_URL` | Yes for Faisal’s Room and contact storage | PostgreSQL connection string with a database dedicated to this application. |
+| `APP_SECURITY_SECRET` | Yes for authenticated/rate-limited use | Cryptographically random secret with at least 32 characters; do not reuse a password. |
+| `MEDIA_STORAGE_DIR` | Yes before uploads | Absolute durable server path outside `public/`, surviving releases. Restrict filesystem permissions to the app process. |
+| `CONTENT_SOURCE` | Start as `files` | Change to `database` only after seed parity and content review. |
+| `DATABASE_SSL` | Provider-dependent | `true` only if required; certificate validation remains enabled. |
+| `RESEND_API_KEY`, `CONTACT_EMAIL`, `CONTACT_FROM_EMAIL` | Optional | Enables an email notification after the lead has been stored. Sender must be verified with Resend. |
 
-`CONTACT_FROM_EMAIL` must be a sender address verified with the selected Resend account/domain. The form deliberately returns an honest setup error until all three values are present; it never pretends to deliver a message.
+Never put a real secret into Git, a client-side `NEXT_PUBLIC_*` variable, or a chat message. `.env.example` contains placeholders only.
 
-Set the public origin when a production URL is available:
+## One-time database and owner setup
 
-```text
-NEXT_PUBLIC_SITE_URL=https://your-verified-production-origin.example
-```
+1. Provision PostgreSQL and durable private media storage. Back up the database before any future content-source switch.
+2. Set `DATABASE_URL`, `DATABASE_SSL` if needed, `APP_SECURITY_SECRET`, `MEDIA_STORAGE_DIR`, and the production origin. Keep `CONTENT_SOURCE=files`.
+3. Install dependencies and run the idempotent migration and seed commands:
 
-This enables absolute canonical, sitemap, Open Graph, and Twitter URLs. Do not replace the supplied social links with guessed provider URLs.
+   ```bash
+   pnpm db:migrate
+   pnpm db:seed
+   pnpm db:verify-seed
+   ```
 
-## Verified contact values
+4. Review the parity output. Seeded settings, projects, page structures, navigation, SEO foundation records, and image metadata remain drafts; a seed does **not** make content public.
+5. Temporarily set `BOOTSTRAP_OWNER_EMAIL` and a strong `BOOTSTRAP_OWNER_PASSWORD` (14–256 characters) in the server environment, then run:
 
-- Phone: `+8801815676523`
-- Phone href: `tel:+8801815676523`
-- Facebook: <https://faisalhossen.com/facebook>
-- Instagram: <https://faisalhossen.com/instagram>
-- GitHub: <https://faisalhossen.com/github>
-- LinkedIn: <https://faisalhossen.com/linkedin>
+   ```bash
+   pnpm db:bootstrap-owner
+   ```
 
-## Public routes
+   This command refuses to create a second owner. **Immediately remove both bootstrap environment variables, especially the password.**
+6. Sign in at `/faisals-room/login`, review records, and publish only content that has been manually checked. A rendered draft preview is owner-only and uncached.
+7. Keep `CONTENT_SOURCE=files` until you deliberately want reviewed published records to drive the public routes. Set `CONTENT_SOURCE=database` only after parity, visual review, and rollback preparation. Incomplete project/navigation content and invalid/unavailable database reads fall back to checked-in content.
+8. Verify the published public output and contact flow. Submit a test only after the real database and optional email configuration are in place; do not send a production test message to a real recipient without coordination.
 
-- `/`
-- `/work`
-- `/work/peoria-hardwood-floors`
-- `/work/nicola`
-- `/work/ai-flooring-visualizer`
-- `/about`
-- `/contact`
+## Contact behavior
 
-The API route `/api/contact` is intentionally excluded from `public/manus-routes.json` because the manifest lists page routes only. `robots.txt` disallows `/api/`.
+The contact route validates origin, input and honeypot, applies a database-backed rate limit, commits the lead and an activity record before attempting optional Resend delivery, and reports `sent`, `failed`, `not_configured`, or `pending` honestly. Without `DATABASE_URL`, durable contact storage is unavailable and submissions are not accepted as saved. Do not represent that state as successful delivery.
 
-## Release verification
+## Smoke-test checklist after configuration
 
-Before switching traffic, run:
+- Public: `/`, `/work`, all three existing `/work/<slug>` pages, `/about`, `/contact`; compare content, identity imagery, links, metadata, and responsive behavior with the current public release.
+- Private: anonymous visits to `/faisals-room` redirect to `/faisals-room/login`; invalid credentials return a generic error; valid owner can access each Phase 1 route; logout and password rotation revoke sessions as expected.
+- CMS: edit/save a draft, confirm it is absent from the public view, open authenticated preview, publish explicitly, verify only the intended public change, review revision history, and restore as a new draft.
+- Media: reject oversize/malformed/SVG files, confirm WebP preview is available only through authenticated media access until a project referencing it is published, and ensure uploads persist across an application release.
+- Leads: submit a controlled test, verify durable storage before email delivery, verify notification states, and inspect the owner-only inbox.
+- Crawl: `/robots.txt` excludes `/api/` and `/faisals-room`; `/sitemap.xml` and `public/manus-routes.json` contain only public page routes.
 
-```bash
-pnpm exec tsc --noEmit
-rm -rf .next && pnpm build
-```
+## Phase 1 verification status at implementation handoff
 
-Then check the page routes above, submit an empty form to confirm field validation, and submit a valid form after the three Resend variables are configured. Confirm the phone link and all four exact social URLs. The final visual review set is listed in `FINAL-REFINEMENT-REPORT.md`.
-
-## Artifact
-
-The GitHub release asset is `faisal-hossen-portfolio-hosting-release.zip`. It contains the deployable source, lockfile, public assets, contact API, documentation, and no secrets, `node_modules`, or `.next` build cache.
+TypeScript, the schema unit suite, and a production build are run in the implementation workspace. Database migration/seed parity, authenticated browser flows, durable media persistence, and the production-origin visual/accessibility review must still be completed against the operator-provided PostgreSQL, filesystem, domain, and owner credentials. See [`FAISALS-ROOM-PHASE-1-REPORT.md`](./FAISALS-ROOM-PHASE-1-REPORT.md) and [`FAISALS-ROOM-TODO.md`](./FAISALS-ROOM-TODO.md).
