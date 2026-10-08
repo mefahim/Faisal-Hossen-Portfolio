@@ -36,6 +36,9 @@ No public live URL was supplied for AI Flooring Visualizer, so the site does not
 
 ## Reports and continuation notes
 
+- [`plan.md`](./plan.md) — Faisal's Room repository audit and exactly 3-phase implementation plan; planning only until user approval
+- [`FAISALS-ROOM-TODO.md`](./FAISALS-ROOM-TODO.md) — phase-gated execution TODO for the next agent
+- [`plan-archive-2026-10-08.md`](./plan-archive-2026-10-08.md) — historical Phase 1 implementation plan retained for context
 - [`PHASE-1-REPORT.md`](./PHASE-1-REPORT.md) — foundation and Home delivery record
 - [`PHASE-2-REPORT.md`](./PHASE-2-REPORT.md) — real projects, Work, About, Contact, and remaining limitations
 - [`PHASE-2-HANDOFF.md`](./PHASE-2-HANDOFF.md) — continuation brief and source evidence

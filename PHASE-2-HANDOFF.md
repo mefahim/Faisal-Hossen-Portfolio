@@ -1,6 +1,6 @@
-# Phase 2 + Future Work Handoff
+# Phase 2 + Faisal's Room Future Work Handoff
 
-এই document-টি এমনভাবে লেখা হয়েছে যেন অন্য একজন AI coding agent শুধু এই GitHub repository clone করে কাজ শুরু করতে পারে। বর্তমান repository-তে **Phase 1 সম্পন্ন**, কিন্তু Phase 2 implementation এখনো শুরু হয়নি। Phase 2-এর জন্য supplied real project assets এবং Google Docs-এর extracted source data repository-তে রাখা হয়েছে।
+এই document-টি এমনভাবে লেখা হয়েছে যেন অন্য একজন AI coding agent শুধু এই GitHub repository clone করে কাজ শুরু করতে পারে। Public website-এর Phase 1, Phase 2, identity refresh, final refinement, এবং hosting release work সম্পন্ন। **পরবর্তী সব planning-এর authoritative source হলো [`plan.md`](./plan.md) এবং [`FAISALS-ROOM-TODO.md`](./FAISALS-ROOM-TODO.md)।** এগুলো user approval-এর আগে কোনো Faisal's Room code implementation অনুমোদন করে না। Phase 2-এর supplied real project assets এবং source data repository-তে রাখা হয়েছে।
 
 ## Repository and current state
 
@@ -14,6 +14,7 @@
 - After cloning, use the actual checkout directory reported by the current environment. Discover the current runtime/Preview URL through that environment’s own web tooling, if available.
 - Existing platform logo metadata is in `app.config.ts`; do not remove it.
 - Push normal commits to the checked-out repository’s `main` branch using the currently configured GitHub authentication. Never force-push, delete branches, or assume that an old remote name exists.
+- Before implementation, read `plan.md`, `FAISALS-ROOM-TODO.md`, the current README, and the latest git history. The product name is **Faisal's Room** and its private route prefix is `/faisals-room`; do not introduce `/admin`.
 
 ## Required access and skills for the next Manus AI agent
 
