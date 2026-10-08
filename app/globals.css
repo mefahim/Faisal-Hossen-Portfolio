@@ -169,6 +169,7 @@ h3 { font-size: 1.35rem; font-weight: 500; line-height: 1.05; }
 .preview-status { margin-top: 1.3rem; }
 .preview-arrow { justify-self: end; }
 
+.selected-work-section { padding-bottom: clamp(4.5rem, 8vw, 8rem); }
 .about-preview { display: grid; gap: 2rem; grid-template-columns: 1fr 0.6fr; padding-bottom: clamp(7rem, 13vw, 13rem); }
 .about-preview h2 { max-width: 720px; }
 .about-preview-copy { align-self: end; color: var(--muted); max-width: 350px; }
