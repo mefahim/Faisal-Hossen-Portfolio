@@ -4,6 +4,9 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   output: "standalone",
+  outputFileTracingIncludes: {
+    "/*": ["./node_modules/react-dom/**/*"],
+  },
   async headers() {
     return [{
       source: "/:path*",

@@ -53,7 +53,7 @@ pnpm test
 pnpm build
 ```
 
-Production database parity, authenticated deployment workflows, and release-durable media acceptance require the target MySQL 8+ service and persistent storage described in [RELEASE.md](./RELEASE.md) and the Phase 1 report. Isolated local MySQL/API/browser evidence is recorded separately and does not substitute for production verification.
+Hostinger MariaDB migration/seed parity and one-time owner bootstrap have been verified. The first Passenger candidate returned HTTP 500 and was rolled back; a corrected standalone build passes local route smoke checks but has not yet been redeployed. Production media durability and the deployed authenticated/browser/security/accessibility checks remain open. Isolated local process-restart evidence does not substitute for production release-durability verification. See [RELEASE.md](./RELEASE.md) and the Phase 1 report.
 
 ## Evidence-led project content
 
