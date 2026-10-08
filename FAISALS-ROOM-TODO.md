@@ -1,6 +1,6 @@
 # Faisal's Room — Implementation TODO
 
-**Status:** Phase 1 implementation source and local release smoke checks are complete. Database-backed acceptance remains blocked by missing operator/deployment inputs documented in the Phase 1 report. Phase 2 and Phase 3 have not been started.
+**Status:** Phase 1 source and local acceptance defects have been addressed. The isolated MySQL 8.0.46 migration/seed/parity, authenticated API workflows, process-restart checks, and local responsive browser matrix passed. Official acceptance remains pending because the deployed Phase 1 routes and production storage/database environment are not available. `CONTENT_SOURCE=files` remains active. Phase 2 and Phase 3 have not been started.
 
 ## Phase 1 — Foundation: secure Control Center and content publishing
 
@@ -13,9 +13,14 @@
 - [x] Add private image upload validation, checksums/dimensions, WebP derivatives, alt/focal metadata, usage references, safe archive rules, and filesystem storage outside the public web root.
 - [x] Store contacts durably before optional Resend notification and expose honest storage/delivery states without adding an unverified email address.
 - [x] Build the responsive dark-sidebar/light-workspace product UI with accessible forms, empty/error states, and no decorative analytics.
-- [ ] Complete migration/seed parity and authenticated workflow tests against the production-equivalent MySQL 8+/storage configuration; finish deployment browser/accessibility review at approved viewports.
+- [x] Execute migration twice, seed twice, and deep source parity on a real isolated local MySQL 8.0.46 server; verify one-time owner bootstrap and duplicate-bootstrap refusal.
+- [x] Execute authenticated MySQL-backed security and content workflows: login throttling, owner authorization, draft, preview, publish, restore-as-new-draft, and published-snapshot preservation.
+- [x] Verify contact lead/activity persistence and owner inbox state; validate private media upload, original/WebP delivery, metadata, rejected oversize/SVG files, usage protection, and survival across an application-process restart.
+- [x] Run the standalone local build across 7 public and 11 Faisal’s Room routes at 360, 390, 430, 768, 1024, 1280, and 1440px: 126 checks, no route failures, overflow, or browser errors; keyboard focus, labels, reduced motion, and mobile drawer behavior checked.
+- [x] Run the deployed public-site baseline at 7 routes × 7 widths (49 combinations); no overflow, missing image alt text, unlabeled controls, unnamed actions, or page errors were observed.
+- [ ] Verify the deployed Phase 1 release, production MySQL parity/rollback, production media durability across a release, and the Phase 1 route/security/accessibility matrix. The current live `/faisals-room` and `/faisals-room/login` both return 404; live robots does not yet exclude `/faisals-room`.
 
-> Audit note (2026-10-08): local typecheck, 6/6 unit tests, standalone production build, public route smoke checks, anonymous private-route redirect, same-origin/cross-origin mutation guards, and public robots/sitemap exclusion checks passed. The acceptance checkbox remains open because no MySQL 8+, production origin/secret, owner bootstrap input, durable storage confirmation, deployed host, or browser automation was available.
+> Audit note (2026-10-08): the checked-in source passed `pnpm typecheck`, `pnpm test` (6/6), and a standalone production build. Local database/API/media/browser results above were executed against an isolated real MySQL server and local filesystem, not the production service. The live public portfolio passed its public viewport baseline, but the live Phase 1 routes are absent and its robots file does not exclude `/faisals-room`. Production database credentials, owner bootstrap input, durable storage confirmation, and a deployed Phase 1 host were not available; therefore Phase 1 is **not officially Accepted** and public reads remain files-backed.
 
 ## Phase 2 — Intelligence: SEO, Analytics, Leads, Health, and redirects
 
@@ -45,6 +50,6 @@
 ## Approval gates
 
 - [x] User directly approved Phase 1 implementation on 2026-10-08; Phases 2 and 3 remain out of scope.
-- [ ] Phase 1 is accepted only after public regression, database parity, security evidence, and recovery baseline review.
+- [ ] Phase 1 is accepted only after the deployed Phase 1 routes pass production regression, production database parity and rollback are explicitly verified, durable media behavior is verified across a release, and security/accessibility evidence is recorded.
 - [ ] Phase 2 requires separate approval for Google API ownership/scopes and privacy/consent decisions.
 - [ ] Phase 3 requires evidence that the operating burden and real usage justify automation and future modules.

@@ -84,7 +84,16 @@ The contact route validates origin, input and honeypot, applies a database-backe
 - Leads: submit a controlled test, verify durable storage before email delivery, verify notification states, and inspect the owner-only inbox.
 - Crawl: `/robots.txt` excludes `/api/` and `/faisals-room`; `/sitemap.xml` and `public/manus-routes.json` contain only public page routes.
 
-## Phase 1 verification status at implementation handoff
+## Historical Phase 1 verification status at implementation handoff
 
 TypeScript, the schema unit suite, and a production build are run in the implementation workspace. Database migration/seed parity, authenticated browser flows, durable media persistence, and the production-origin visual/accessibility review must still be completed against the operator-provided MySQL 8+, filesystem, domain, and owner credentials. See [`FAISALS-ROOM-PHASE-1-REPORT.md`](./FAISALS-ROOM-PHASE-1-REPORT.md) and [`FAISALS-ROOM-TODO.md`](./FAISALS-ROOM-TODO.md).
 On 2026-10-08, a clean checkout also passed frozen dependency installation, `pnpm typecheck`, `pnpm test` (6/6), standalone `pnpm build`, public route smoke checks, private-route redirect, same-origin/cross-origin mutation guards, and robots/sitemap exclusion checks. Database migration/seed parity, authenticated browser flows, durable media persistence, contact persistence, and the production-origin visual/accessibility review still must be completed against the operator-provided MySQL 8+, filesystem, domain, owner credentials, and deployed host. See [`FAISALS-ROOM-PHASE-1-REPORT.md`](./FAISALS-ROOM-PHASE-1-REPORT.md) and [`FAISALS-ROOM-TODO.md`](./FAISALS-ROOM-TODO.md). Do not mark Phase 1 accepted from these local checks alone.
+
+
+## Final Phase 1 acceptance status — 2026-10-08
+
+Local acceptance on a real isolated MySQL 8.0.46 server and the standalone production build passed: repeated migration/seed and deep source parity; one-time owner bootstrap; authenticated security and content lifecycle; persisted contact/inbox state; private media validation/metadata/restart delivery; session revocation; and the 126-check local browser viewport matrix. The final source also passes `pnpm typecheck`, `pnpm test` (6/6), and `pnpm build`. Full results and boundaries are in [`FAISALS-ROOM-PHASE-1-REPORT.md`](./FAISALS-ROOM-PHASE-1-REPORT.md).
+
+The deployed public portfolio passed its 49 public-route/viewport baseline checks, but this is not a deployed Phase 1 test. On 2026-10-08 the live `/faisals-room` and `/faisals-room/login` both returned HTTP 404, and `/robots.txt` excluded `/api/` but not `/faisals-room`. No production MySQL/owner bootstrap configuration or provider-confirmed persistent storage was available. Local `/tmp` process-restart testing does not establish release durability.
+
+`CONTENT_SOURCE=files` remains active; no production source switch was made. **Phase 1 is not officially Accepted.** Keep the release gate open until Faisal’s Room is actually deployed and its production database parity, rollback, durable media storage, private-route/crawl policy, and deployed browser/security/accessibility checks are verified. Phase 2 and Phase 3 remain out of scope.

@@ -19,7 +19,7 @@ Open `http://localhost:3000`. The public site continues to use its verified file
 - `/work/nicola` — Nicola case study
 - `/work/ai-flooring-visualizer` — AI Flooring Visualizer case study
 - `/about` — About the practice and working principles
-- `/contact` — Contact form with durable lead storage once PostgreSQL is configured
+- `/contact` — Contact form with durable lead storage once MySQL 8+ is configured
 
 ## Private Phase 1 routes
 
@@ -27,7 +27,7 @@ Open `http://localhost:3000`. The public site continues to use its verified file
 
 ## Phase 1 database setup
 
-Provision PostgreSQL and persistent server-side media storage, then configure `DATABASE_URL`, `APP_SECURITY_SECRET` (random, at least 32 characters), `MEDIA_STORAGE_DIR` (outside `public/`, durable across releases), and the verified `NEXT_PUBLIC_SITE_URL`. Keep `CONTENT_SOURCE=files` initially.
+Provision MySQL 8+ and persistent server-side media storage, then configure `DATABASE_URL`, `APP_SECURITY_SECRET` (random, at least 32 characters), `MEDIA_STORAGE_DIR` (outside `public/`, durable across releases), and the verified `NEXT_PUBLIC_SITE_URL`. Keep `CONTENT_SOURCE=files` initially.
 
 ```bash
 pnpm db:migrate
@@ -53,7 +53,7 @@ pnpm test
 pnpm build
 ```
 
-Database migration, seed parity, authenticated workflow, and media-persistence acceptance require the configured PostgreSQL and persistent storage described in [RELEASE.md](./RELEASE.md) and the Phase 1 report.
+Production database parity, authenticated deployment workflows, and release-durable media acceptance require the target MySQL 8+ service and persistent storage described in [RELEASE.md](./RELEASE.md) and the Phase 1 report. Isolated local MySQL/API/browser evidence is recorded separately and does not substitute for production verification.
 
 ## Evidence-led project content
 
@@ -64,7 +64,7 @@ The three project stories are structured in `content/projects.ts` from committed
 - [Master plan](./plan.md) — approved three-phase architecture and exact scope
 - [Phase TODO](./FAISALS-ROOM-TODO.md) — implementation checklist and gates; Phase 2/3 remain open
 - [Phase 1 implementation report](./FAISALS-ROOM-PHASE-1-REPORT.md) — changes, security, validation, configuration, and next steps
-- [Release/runbook](./RELEASE.md) — PostgreSQL setup, owner bootstrap, media persistence, deployment, and smoke tests
+- [Release/runbook](./RELEASE.md) — MySQL setup, owner bootstrap, media persistence, deployment, and smoke tests
 - [`plan-archive-2026-10-08.md`](./plan-archive-2026-10-08.md) — historical Phase 1 planning notes
 - [`PHASE-1-REPORT.md`](./PHASE-1-REPORT.md) — historical portfolio delivery record
 - [`PHASE-2-REPORT.md`](./PHASE-2-REPORT.md), [`PHASE-2-HANDOFF.md`](./PHASE-2-HANDOFF.md) — earlier public-website delivery records (not Faisal’s Room Phase 2)

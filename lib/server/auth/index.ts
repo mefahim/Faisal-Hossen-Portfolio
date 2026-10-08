@@ -86,9 +86,9 @@ export async function recordLoginFailure(email: string, request: Request) {
     `INSERT INTO login_attempts(subject_hash, attempts, window_started_at, locked_until, updated_at)
      VALUES($1,1,now(),NULL,now())
      ON DUPLICATE KEY UPDATE
+       locked_until=IF(IF(window_started_at < DATE_SUB(NOW(), INTERVAL 15 MINUTE), 1, attempts+1) >= 5, DATE_ADD(NOW(), INTERVAL 15 MINUTE), NULL),
        attempts=IF(window_started_at < DATE_SUB(NOW(), INTERVAL 15 MINUTE), 1, attempts+1),
        window_started_at=IF(window_started_at < DATE_SUB(NOW(), INTERVAL 15 MINUTE), NOW(), window_started_at),
-       locked_until=IF(IF(window_started_at < DATE_SUB(NOW(), INTERVAL 15 MINUTE), 1, attempts+1) >= 5, DATE_ADD(NOW(), INTERVAL 15 MINUTE), NULL),
        updated_at=NOW()`,
     [key],
   );

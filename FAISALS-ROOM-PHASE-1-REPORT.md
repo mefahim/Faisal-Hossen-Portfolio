@@ -129,11 +129,11 @@ Resolve any migration/seed error before proceeding. Record the migration output,
 
 ## Phase boundaries and next authorization
 
-Phase 1 is implemented in source but **acceptance remains pending** as described above. Phase 2’s Google connections, analytics data, expanded SEO audits, redirects and advanced lead workflow remain untouched. Phase 3’s complete revision browser, backups, scheduled automation, monitoring and future modules remain untouched. Ask Faisal for separate approval before starting either phase.
+Phase 1 implementation is complete, but **official acceptance remains pending** under the follow-up acceptance audit below. Phase 2’s Google connections, analytics data, expanded SEO audits, redirects and advanced lead workflow remain untouched. Phase 3’s complete revision browser, backups, scheduled automation, monitoring and future modules remain untouched. Ask Faisal for separate approval before starting either phase.
 
-### Acceptance audit — 2026-10-08
+### Initial implementation handoff audit — 2026-10-08 (historical)
 
-The current `main` branch was audited from a clean checkout at handoff revision `54d54f0`. No source redesign or Phase 2/Phase 3 work was started. The following checks were re-run in this sandbox:
+At the implementation handoff, `main` was audited from a clean checkout at revision `54d54f0`. No source redesign or Phase 2/Phase 3 work was started. The following checks were re-run in this sandbox at that stage:
 
 - `pnpm install --frozen-lockfile` — passed.
 - `pnpm typecheck` — passed.
@@ -143,4 +143,26 @@ The current `main` branch was audited from a clean checkout at handoff revision 
 - Security smoke test — passed: cross-origin content mutation returned 403 and same-origin unauthenticated content mutation returned 401.
 - Public crawl check — passed: robots excludes `/api/` and `/faisals-room`; sitemap contained no private/API route.
 
-The required acceptance environment was not available in this session: no `DATABASE_URL`/MySQL 8+ service, verified production `NEXT_PUBLIC_SITE_URL`, operator-provided owner bootstrap input, deployment-host access, or provider-confirmed durable `MEDIA_STORAGE_DIR` was present. Playwright/browser automation was also not installed. Therefore migration/seed parity, authenticated workflows, contact persistence, media restart durability, production-origin browser review, accessibility review, and viewport review remain unexecuted—not passed.
+At that initial handoff, a MySQL 8+ service, production deployment access, operator bootstrap input, provider-confirmed durable media path, and browser automation were not available. Those checks were recorded as unexecuted—not passed—at the time. The follow-up audit below supersedes that initial status for checks subsequently run, while keeping production-only checks explicitly pending.
+
+
+### Follow-up acceptance execution — 2026-10-08 (final status)
+
+Acceptance work left Phase 2/Phase 3 out of scope. Real MySQL runs uncovered and fixed compatibility defects: the seed omitted the section-content value; content listing and revision restore used reserved column `key` without quoting; page-section upserts omitted the required UUID primary key in draft, publish, and restore; login-failure upsert assignment order started lockout after four rather than five failures; and the contact rate limiter expected a result row from a MySQL write instead of reading bucket state transactionally. A local-only responsive correction also constrained the protected-preview title to the Control Center heading scale after the browser matrix found 5px overflow at 768px.
+
+**Executed against the isolated local MySQL service and standalone production build:**
+
+- MySQL `8.0.46-0ubuntu0.24.04.4`; 16 schema tables and one migration record. `pnpm db:migrate` passed twice (second run reported up to date); `pnpm db:seed` passed twice; `pnpm db:verify-seed` passed deep checks for settings, 3 projects, 7 pages/9 sections, 7 navigation items, 7 SEO records, and 3 project images including byte counts, dimensions, SHA-256 checksums, alt text, and cover references. Seed content remained draft-only.
+- One owner bootstrap succeeded; a second bootstrap was refused. The acceptance account and database were disposable local test state, not production credentials.
+- `pnpm typecheck`, `pnpm test` (6/6), and `pnpm build` passed on the final source.
+- Authenticated MySQL/API run passed: anonymous API denial (401), cross-origin mutation denial (403), generic login failures, lockout after five failures (429 on the next attempt), owner login and secure eight-hour cookie, page listing, draft save, uncached protected preview, explicit publish, restore-as-new-draft with the published snapshot unchanged, and public reads remaining file-backed.
+- Contact submission returned 201 with `not_configured`; the lead and audit activity were persisted and visible in the owner inbox. No email was sent.
+- Media checks passed: oversized image rejected (413), SVG rejected (415), valid PNG accepted (201), private original stored mode 600, WebP derivative served only to the authenticated owner with no-store, metadata persisted, project-reference archive protection returned 409, and session/password rotation revoked the prior session.
+- After restarting the local app process, the MySQL-backed owner session and the private original PNG plus WebP derivative still loaded successfully. Public content remained file-backed. This verifies a local process restart only; it does **not** prove durability across a production host/release or persistent-storage provider.
+- Local Playwright run covered 7 public routes and 11 Faisal’s Room routes at 360, 390, 430, 768, 1024, 1280, and 1440px (126 route/viewport checks). Final run: no route failures, horizontal overflow, or browser page errors; login/contact labels, visible keyboard focus, reduced-motion preference, and mobile drawer open/close behavior were exercised.
+
+**Deployed public-site baseline (separate from the Phase 1 app):** On `https://faisalhossen.com`, Playwright checked 7 existing public routes at the same 7 widths (49 combinations). Those checks passed with no overflow, missing image alt text, unlabelled controls, unnamed actions, or browser page errors. Contact labels, one live region, visible 3px keyboard focus, and reduced motion were observed. `/sitemap.xml` contained no private/API paths. The deployed `/robots.txt` excludes `/api/` but does not exclude `/faisals-room`.
+
+**Production Phase 1 status and disposition:** Live `https://faisalhossen.com/faisals-room` and `/faisals-room/login` both returned HTTP 404 on 2026-10-08, so the Phase 1 application is not present on the deployed public origin and deployed Faisal’s Room authentication/accessibility/regression did **not** pass. The repository exposes no GitHub Actions workflows, environments, or registered GitHub deployments for this release. Production MySQL, owner bootstrap input, production security configuration, and a provider-confirmed persistent media path were not available to this run. The local MySQL and `/tmp` filesystem results above must not be represented as production verification.
+
+`CONTENT_SOURCE=files` remained set throughout; it was not switched to `database`. The local publish/restore test demonstrated that the file-backed public route did not expose the test draft, but production rollback and production parity have not been exercised. **Phase 1 cannot officially be marked Accepted.** Keep the acceptance gate open until the Phase 1 release is actually deployed, production database parity and rollback are explicitly verified, production media durability across a release is demonstrated, the private routes/crawl policy are correct, and the deployed browser/security/accessibility matrix passes. Phase 2 and Phase 3 have not been started.

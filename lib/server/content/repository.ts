@@ -71,7 +71,7 @@ export async function listContent(kind: ContentKind): Promise<ContentRecord[]> {
   const table = kind === "pages" ? "pages" : kind === "projects" ? "projects" : kind === "navigation" ? "navigation_items" : "seo_metadata";
   const keyColumn = kind === "pages" ? "`key`" : kind === "projects" ? "slug" : kind === "navigation" ? "id" : "route";
   const titleColumn = kind === "pages" ? "title" : kind === "projects" ? "slug" : kind === "navigation" ? "label" : "route";
-  const rows = (await query<{ key: string; title: string; status: string; draft: Record<string, unknown>; published: Record<string, unknown> | null; updated_at: Date }>(`SELECT ${keyColumn} AS key, ${titleColumn} AS title, status, draft, published, updated_at FROM ${table} ORDER BY updated_at DESC`)).rows;
+  const rows = (await query<{ key: string; title: string; status: string; draft: Record<string, unknown>; published: Record<string, unknown> | null; updated_at: Date }>(`SELECT ${keyColumn} AS \`key\`, ${titleColumn} AS title, status, draft, published, updated_at FROM ${table} ORDER BY updated_at DESC`)).rows;
   return rows.map((row) => ({ key: row.key, title: row.title, status: row.status, draft: row.draft, published: row.published, updatedAt: row.updated_at.toISOString() }));
 }
 
@@ -94,10 +94,10 @@ export async function saveDraft(kind: ContentKind, key: string, input: Record<st
       const pageId = (await client.query<{ id: string }>("SELECT id FROM pages WHERE `key`=$1", [key])).rows[0]?.id;
       if (!pageId) throw new Error("Page record was not found.");
       for (const section of page.sections) await client.query(
-        `INSERT INTO page_sections(page_id,section_key,section_type,position,status,draft)
-         VALUES($1,$2,$3,$4,'draft',$5)
+        `INSERT INTO page_sections(id,page_id,section_key,section_type,position,status,draft)
+         VALUES($1,$2,$3,$4,$5,'draft',$6)
          ON DUPLICATE KEY UPDATE section_type=VALUES(section_type),position=VALUES(position),draft=VALUES(draft),status='draft'`,
-        [pageId, section.key, section.type, section.position, JSON.stringify(section.content)],
+        [randomUUID(), pageId, section.key, section.type, section.position, JSON.stringify(section.content)],
       );
     }
     await client.query("INSERT INTO revisions(id,entity_type,entity_id,snapshot,author_id,publish_state) VALUES($1,$2,$3,$4,$5,'draft')", [randomUUID(), kind === "pages" ? "page" : kind === "projects" ? "project" : kind === "navigation" ? "navigation" : kind === "seo" ? "seo" : "settings", entityId, JSON.stringify(draft), actorId]);
@@ -149,10 +149,10 @@ export async function publishContent(kind: ContentKind, key: string, actorId: st
       const pageId = row.id;
       const page = draft as z.infer<typeof pageSchema>;
       for (const section of page.sections) await client.query(
-        `INSERT INTO page_sections(page_id,section_key,section_type,position,status,draft,published)
-         VALUES($1,$2,$3,$4,'published',$5,$5)
+        `INSERT INTO page_sections(id,page_id,section_key,section_type,position,status,draft,published)
+         VALUES($1,$2,$3,$4,$5,'published',$6,$6)
          ON DUPLICATE KEY UPDATE section_type=VALUES(section_type),position=VALUES(position),draft=VALUES(draft),published=VALUES(published),status='published'`,
-        [pageId, section.key, section.type, section.position, JSON.stringify(section.content)],
+        [randomUUID(), pageId, section.key, section.type, section.position, JSON.stringify(section.content)],
       );
       const sectionKeys = page.sections.map((section) => section.key);
       const placeholders = sectionKeys.map((_, index) => `$${index + 2}`).join(",");
@@ -167,7 +167,7 @@ export async function restoreRevision(revisionId: string, actorId: string, reque
   await transaction(async (client) => {
     const revision = (await client.query<{ entity_type: string; entity_id: string; snapshot: Record<string, unknown> }>("SELECT entity_type,entity_id,snapshot FROM revisions WHERE id=$1", [revisionId])).rows[0];
     if (!revision) throw new Error("Revision was not found.");
-    const mapping: Record<string, { table: string; column: string }> = { settings: { table: "site_settings", column: "id" }, page: { table: "pages", column: "key" }, project: { table: "projects", column: "slug" }, navigation: { table: "navigation_items", column: "id" }, seo: { table: "seo_metadata", column: "route" } };
+    const mapping: Record<string, { table: string; column: string }> = { settings: { table: "site_settings", column: "id" }, page: { table: "pages", column: "`key`" }, project: { table: "projects", column: "slug" }, navigation: { table: "navigation_items", column: "id" }, seo: { table: "seo_metadata", column: "route" } };
     const target = mapping[revision.entity_type];
     if (!target) throw new Error("This revision type cannot be restored.");
     const key = revision.entity_type === "settings" ? "default" : revision.entity_id;
@@ -178,10 +178,10 @@ export async function restoreRevision(revisionId: string, actorId: string, reque
       const page = revision.snapshot as z.infer<typeof pageSchema>;
       const pageId = (await client.query<{ id: string }>("SELECT id FROM pages WHERE `key`=$1", [key])).rows[0]?.id;
       if (pageId) for (const section of page.sections) await client.query(
-        `INSERT INTO page_sections(page_id,section_key,section_type,position,status,draft)
-         VALUES($1,$2,$3,$4,'draft',$5)
+        `INSERT INTO page_sections(id,page_id,section_key,section_type,position,status,draft)
+         VALUES($1,$2,$3,$4,$5,'draft',$6)
          ON DUPLICATE KEY UPDATE section_type=VALUES(section_type),position=VALUES(position),draft=VALUES(draft),status='draft'`,
-        [pageId, section.key, section.type, section.position, JSON.stringify(section.content)],
+        [randomUUID(), pageId, section.key, section.type, section.position, JSON.stringify(section.content)],
       );
     }
     await client.query("INSERT INTO revisions(id,entity_type,entity_id,snapshot,author_id,publish_state,restores_revision_id) VALUES($1,$2,$3,$4,$5,'restored',$6)", [randomUUID(), revision.entity_type, revision.entity_id, JSON.stringify(revision.snapshot), actorId, revisionId]);

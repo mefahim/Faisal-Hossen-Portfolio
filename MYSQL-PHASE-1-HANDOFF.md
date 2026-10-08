@@ -74,3 +74,12 @@ pnpm start
 ## Before Phase 2 starts
 
 Phase 1 must be formally Accepted in the report. The owner must separately approve Phase 2 scope, Google API ownership and OAuth scopes, consent/privacy decisions, analytics data retention, SEO/audit requirements, and any redirect or advanced lead behavior. No Phase 2 code should be started from this handoff until those approvals are recorded.
+
+
+## Recorded acceptance execution — 2026-10-08
+
+A real isolated local MySQL `8.0.46-0ubuntu0.24.04.4` instance was exercised against the final Phase 1 source. Migration and seed each ran twice; `pnpm db:verify-seed` passed deep source parity for settings, 3 projects, 7 pages/9 sections, 7 navigation records, 7 SEO records, and checksummed metadata for 3 project images. The single-owner bootstrap succeeded once and rejected a second owner. The disposable test database contained 16 tables and one migration record.
+
+The authenticated API acceptance run passed login throttling and lockout, owner-only authorization, draft/preview/publish/restore lifecycle, published-snapshot preservation, file-backed public rollback behavior, persisted contact lead/activity and owner-inbox read, private validated image original/WebP handling, invalid/oversize upload rejection, media metadata, archive protection, password rotation, and session revocation. The standalone app was restarted; the test session and uploaded image original/derivative remained readable from the isolated local database/filesystem. `pnpm typecheck`, `pnpm test` (6/6), and `pnpm build` passed. See the Phase 1 report for the exact outcomes and scope.
+
+These results are **local acceptance evidence only**. They do not prove production database parity, production storage durability across a release, or deployed Faisal’s Room routes. On the current live origin, `/faisals-room` and `/faisals-room/login` return 404; `/robots.txt` excludes `/api/` but not `/faisals-room`. Keep `CONTENT_SOURCE=files`; do not mark Phase 1 Accepted or change the public source until production parity, rollback, durable storage, and deployed regression checks pass.
