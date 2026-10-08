@@ -1,4 +1,4 @@
-# Fahim Personal Website — Phase 1 + Phase 2 Outcomes
+# Faisal Hossen Personal Website — Phase 1 + Phase 2 Outcomes
 
 ## Phase 1 — Foundation, Design System, and Home
 
@@ -6,7 +6,7 @@
 - [x] **Implement the approved editorial product design system using the specified warm ivory, surface, ink, muted, line, and diagnostic chartreuse tokens; include responsive typography, spacing, restrained radii, subtle shadows, visible focus states, and reduced-motion support.**
 - [x] **Build reusable global components for the responsive header, lightweight mobile navigation, footer, buttons, tags/chips, section headings, reveal animation, section shells, and restrained CTA behavior; keep navigation free of broken primary links while `/work` and `/about` remain Phase 2-gated.**
 - [x] **Build the Home page around the positioning “I don't just build websites. I solve digital problems.” with the supplied supporting copy, “Start a project” and “Explore my work” calls to action, and the narrative order problem → thinking → proof → capability → trust → action.**
-- [x] **Use only the supplied real identity assets, preserving Fahim’s recognizable appearance; map the five supplied images, use a real portrait in the Home Workbench, and do not invent client work, testimonials, statistics, revenue, awards, certifications, achievements, project outcomes, or fake reviews.**
+- [x] **Use only the supplied real identity assets, preserving Faisal Hossen’s recognizable appearance; map the five supplied images, use a real portrait in the Home Workbench, and do not invent client work, testimonials, statistics, revenue, awards, certifications, achievements, project outcomes, or fake reviews.**
 - [x] **Implement a meaningful Workbench and Problem Playground: selectable problem chips/cards must show contextual diagnosis, a short recommendation, and a next step without score, gamification, fake AI effects, or unsupported claims; interactions must be keyboard accessible and usable on touch screens.**
 - [x] **Present Web, Digital Products, AI, Automation, UX, and SEO as concise reusable capability content, together with clear expectations and trust language that does not overclaim.**
 - [x] **Implement mobile-first responsive behavior for 360px, 375px, 390px, 430px, 768px, 1024px, 1280px, 1440px, and 1600px layouts, including thumb-friendly controls, intentional mobile composition, horizontal inspection where useful, no scroll hijacking, and no autoplay media or sound.**
@@ -23,6 +23,12 @@
 - [x] **Build `/contact` as a useful transparent page with welcome problem types, verified-contact placeholder language, links to Work/About, and no fake form submission, email service, database, authentication, or backend.**
 - [x] **Preserve the Phase 1 palette, typography, responsive behavior, accessibility rules, reduced-motion behavior, Server Component default, and reusable component structure.**
 - [x] **Update `public/manus-routes.json`, `app/sitemap.ts`, `app/robots.ts` as appropriate, `TODO.md`, `content-asset-map.md`, `README.md`, and add `PHASE-2-REPORT.md`.**
+
+## Identity refresh — 2026-10-08
+
+- [x] **Replace the user-facing Fahim identity with Faisal Hossen across the wordmark, navigation labels, metadata, JSON-LD, route manifest, page copy, and footer.**
+- [x] **Use the supplied close portrait on `/about` and supplied smiling beach portrait on `/contact` without changing the face, identity, or recognizable appearance; do not generate a lookalike or use either image as project proof.**
+- [x] **Run typecheck, production build, route/image/404 checks, Preview metadata checks, and rendered About/Contact overflow and console review; do not publish a permanent production URL in this update.**
 - [x] **Run and record final TypeScript, production build, HTTP route/image/404 checks, raw HTML metadata/JSON-LD checks, responsive review, and console-error review before delivery.**
 - [x] **Commit all changes with `Integrate real projects and add work about contact routes` and push the current repository `main` branch without force-pushing or starting Phase 3 deployment/publishing.**
 

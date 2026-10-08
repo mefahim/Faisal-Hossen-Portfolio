@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import { ArrowRight, Check, CircleSlash2 } from "lucide-react";
 import { Button } from "@/components/site/Button";
 import { Footer } from "@/components/site/Footer";
@@ -8,7 +9,7 @@ import { site } from "@/content/site";
 import { createPageMetadata } from "@/lib/metadata";
 
 export const metadata: Metadata = createPageMetadata({
-  title: "Contact Fahim",
+  title: "Contact Faisal Hossen",
   description: "A transparent contact page for starting a conversation about a website, product experience, AI, automation, UX, or SEO problem.",
   path: "/contact",
 });
@@ -35,6 +36,9 @@ export default function ContactPage() {
             <div className="contact-placeholder"><span className="status-dot" aria-hidden="true" /> Contact details will be added once verified.</div>
           </div>
           <div className="contact-panel contact-panel-secondary">
+            <div className="contact-portrait-wrap">
+              <Image src="/assets/about/portrait-smile.png" alt="Faisal Hossen standing by the sea" fill sizes="(max-width: 800px) 100vw, 35vw" className="contact-portrait" />
+            </div>
             <p className="eyebrow">Good problems to bring</p>
             <ul className="contact-list">
               {[
@@ -49,7 +53,7 @@ export default function ContactPage() {
 
         <section className="section-shell contact-links-section" aria-labelledby="contact-links-title">
           <div><p className="eyebrow">While that link is being verified</p><h2 id="contact-links-title">Read the work or learn how the practice is shaped.</h2></div>
-          <div className="contact-links-actions"><Button href="/work">Explore selected work</Button><Button href="/about" variant="secondary">About Fahim</Button></div>
+          <div className="contact-links-actions"><Button href="/work">Explore selected work</Button><Button href="/about" variant="secondary">About Faisal Hossen</Button></div>
         </section>
 
         <section className="section-shell contact-note-band"><ArrowRight aria-hidden="true" size={18} /><p>There is no fake form, inbox, social link, or backend behind this page. The boundary is intentional until a current contact method is confirmed.</p></section>

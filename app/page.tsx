@@ -16,14 +16,14 @@ const structuredData = {
   "@graph": [
     {
       "@type": "Person",
-      name: "Fahim",
+      name: "Faisal Hossen",
       jobTitle: "Independent Web Developer",
       description: site.supporting,
       knowsAbout: site.capabilities,
     },
     {
       "@type": "WebSite",
-      name: "Fahim — Digital Problem Solver",
+      name: "Faisal Hossen — Digital Problem Solver",
       description: site.supporting,
     },
   ],
@@ -177,7 +177,7 @@ export default function HomePage() {
 
         <section className="section-shell about-preview" id="about-preview" aria-labelledby="about-preview-title">
           <div>
-            <p className="eyebrow">About / next phase</p>
+            <p className="eyebrow">About / the practice</p>
             <h2 id="about-preview-title">A digital home should still feel human.</h2>
           </div>
           <div className="about-preview-copy">

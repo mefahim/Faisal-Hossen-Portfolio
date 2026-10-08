@@ -42,7 +42,7 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
     description: project.summary,
     image: project.image,
     about: project.category,
-    creator: { "@type": "Person", name: "Fahim" },
+    creator: { "@type": "Person", name: "Faisal Hossen" },
     keywords: project.focus.join(", "),
   };
 

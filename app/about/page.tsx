@@ -10,8 +10,8 @@ import { site, thinkingPrinciples } from "@/content/site";
 import { createPageMetadata } from "@/lib/metadata";
 
 export const metadata: Metadata = createPageMetadata({
-  title: "About Fahim",
-  description: "About Fahim’s practical, independent approach to web development, product thinking, UX, AI, automation, and SEO.",
+  title: "About Faisal Hossen",
+  description: "About Faisal Hossen’s practical, independent approach to web development, product thinking, UX, AI, automation, and SEO.",
   path: "/about",
 });
 
@@ -30,7 +30,7 @@ export default function AboutPage() {
 
         <section className="section-shell about-story-section" aria-labelledby="about-story-title">
           <div className="about-portrait-wrap">
-            <Image src="/assets/fahim-workbench.jpg" alt="Fahim in an outdoor portrait" fill sizes="(max-width: 800px) 100vw, 40vw" className="about-portrait" />
+            <Image src="/assets/about/portrait-profile.png" alt="Faisal Hossen in a black jacket portrait" fill sizes="(max-width: 800px) 100vw, 40vw" className="about-portrait" />
             <span className="photo-caption">The person behind the systems</span>
           </div>
           <div className="about-story-copy">

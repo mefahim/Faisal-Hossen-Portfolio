@@ -36,18 +36,18 @@ export function createPageMetadata({ title, description, path, image, type = "we
 export const siteMetadata: Metadata = {
   metadataBase: publicOrigin ? new URL(publicOrigin) : undefined,
   title: {
-    default: "Fahim — Digital Problem Solver",
-    template: "%s — Fahim",
+    default: "Faisal Hossen — Digital Problem Solver",
+    template: "%s — Faisal Hossen",
   },
   description:
-    "Fahim designs and builds thoughtful digital solutions that solve real problems, simplify workflows, and create better experiences.",
-  keywords: ["Fahim", "digital problem solver", "web developer", "UX", "automation", "SEO"],
+    "Faisal Hossen designs and builds thoughtful digital solutions that solve real problems, simplify workflows, and create better experiences.",
+  keywords: ["Faisal Hossen", "digital problem solver", "web developer", "UX", "automation", "SEO"],
   authors: [{ name: site.name }],
   creator: site.name,
   alternates: publicOrigin ? { canonical: "/" } : undefined,
   openGraph: {
     type: "website",
-    siteName: "Fahim — Digital Problem Solver",
+    siteName: "Faisal Hossen — Digital Problem Solver",
     title: site.positioning,
     description: site.supporting,
     url: publicOrigin ? "/" : undefined,

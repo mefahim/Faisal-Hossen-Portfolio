@@ -388,3 +388,11 @@ h3 { font-size: 1.35rem; font-weight: 500; line-height: 1.05; }
   .contact-panel-primary > svg { margin-top: 2rem; }
   .contact-placeholder { align-items: start; }
 }
+
+/* Faisal Hossen identity imagery */
+.contact-portrait-wrap { aspect-ratio: 1.45 / 1; background: var(--surface-2); margin: -1rem -1rem 2rem; min-height: 220px; overflow: hidden; position: relative; }
+.contact-portrait { object-fit: cover; object-position: 50% 45%; }
+.contact-panel-secondary .eyebrow { color: #a2a79c; }
+@media (max-width: 800px) {
+  .contact-portrait-wrap { margin: -1.5rem -1.5rem 2rem; }
+}

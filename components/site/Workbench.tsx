@@ -9,7 +9,7 @@ const signals = [
 
 export function Workbench() {
   return (
-    <div className="workbench" aria-label="Fahim workbench: a visual summary of his problem-solving approach">
+    <div className="workbench" aria-label="Faisal Hossen workbench: a visual summary of his problem-solving approach">
       <div className="workbench-topline">
         <span className="status-dot" aria-hidden="true" />
         <span>Workbench / thinking in public</span>
@@ -19,8 +19,8 @@ export function Workbench() {
         <div className="workbench-photo-wrap">
           <Image
             className="workbench-photo"
-            src="/assets/fahim-workbench.jpg"
-            alt="Fahim standing outdoors in a navy shirt"
+            src="/assets/faisal-workbench.jpg"
+            alt="Faisal Hossen standing outdoors in a navy shirt"
             fill
             sizes="(max-width: 768px) 88vw, 39vw"
             priority

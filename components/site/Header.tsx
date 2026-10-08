@@ -18,8 +18,8 @@ export function Header() {
   return (
     <header className="site-header">
       <div className="header-inner">
-        <Link className="wordmark" href="/" aria-label="Fahim home">
-          FAHIM<span aria-hidden="true">·</span>
+        <Link className="wordmark" href="/" aria-label="Faisal Hossen home">
+          FAISAL HOSSEN<span aria-hidden="true">·</span>
         </Link>
 
         <nav className="desktop-nav" aria-label="Primary navigation">

@@ -6,11 +6,11 @@ Source folder: Google Drive folder `1vihzAxjEUOomS-fbwNgvArCR6t2cQxW3`
 
 | Drive file | Local evidence | Managed path | Visual description | Intended placement |
 | --- | --- | --- | --- | --- |
-| `file_00000000868082088f57b80c2f5ffabf.jpg` | `drive_asset_01.jpg` | `public/assets/fahim-workbench.jpg` (managed backup: `/manus-storage/drive_asset_01_4f7dc037.jpg`) | Full-body outdoor portrait in a navy shirt with warm bokeh | Phase 1 Home Workbench portrait |
-| `file_00000000de5882089fc57902d9705297.png` | `drive_asset_02.png` | `/manus-storage/drive_asset_02_9e71d1b5.png` | Full-body beach portrait at sunset, phone in hand | Phase 2 About visual story |
-| `file_000000007728820885bd77589e8b2335.png` | `drive_asset_03.png` | `/manus-storage/drive_asset_03_07156d77.png` | Front-facing smiling beach portrait in black shirt | Phase 2 About/contact visual |
-| `file_00000000a03c8208ae82c81b6aa09756.png` | `drive_asset_04.png` | `/manus-storage/drive_asset_04_1ec7ccd9.png` | Back-facing beach/sunset portrait | Phase 2 reflective visual story |
-| `file_0000000092b48208bcfcc53a652ade1d.png` | `drive_asset_05.png` | `/manus-storage/drive_asset_05_6e17a9db.png` | Close portrait on light background in black jacket | Phase 2 profile / contact block |
+| `file_00000000868082088f57b80c2f5ffabf.jpg` | `drive_asset_01.jpg` | `public/assets/faisal-workbench.jpg` (managed backup: `/manus-storage/drive_asset_01_4f7dc037.jpg`) | Full-body outdoor portrait in a navy shirt with warm bokeh | Home Workbench portrait |
+| `file_00000000de5882089fc57902d9705297.png` | `drive_asset_02.png` | Supplied and inspected; not used in the current interface | Full-body beach portrait at sunset, phone in hand | Available for future identity-led placement |
+| `file_000000007728820885bd77589e8b2335.png` | `public/assets/about/portrait-smile.png` | Local project asset | Front-facing smiling beach portrait in black shirt | Contact visual |
+| `file_00000000a03c8208ae82c81b6aa09756.png` | `drive_asset_04.png` | Supplied and inspected; not used in the current interface | Back-facing beach/sunset portrait | Available for future identity-led placement |
+| `file_0000000092b48208bcfcc53a652ade1d.png` | `public/assets/about/portrait-profile.png` | Local project asset | Close portrait on light background in black jacket | About profile visual |
 
 ## Phase 2 source
 
@@ -30,7 +30,7 @@ Source folder: Google Drive folder `1CUIGAx67rFEd8ThLkvTDmEXFbC8KWoBq`
 - No public live URL was supplied for AI Flooring Visualizer.
 - The project image assets are supplied visual representations; do not infer unsupported metrics or outcomes from them.
 - Do not use any portrait as evidence of a client engagement or project outcome.
-- Do not generate a lookalike of Fahim or alter identity characteristics.
+- Do not generate a lookalike of Faisal Hossen or alter identity characteristics.
 - Missing verified contact email/social URLs and performance data remain explicit limitations.
 
 ## Phase 2 implementation placements
@@ -38,6 +38,8 @@ Source folder: Google Drive folder `1CUIGAx67rFEd8ThLkvTDmEXFbC8KWoBq`
 - `public/assets/projects/peoria-hardwood-floors.png` → Home Selected Work, `/work`, and `/work/peoria-hardwood-floors` hero visual.
 - `public/assets/projects/nicola.png` → Home Selected Work, `/work`, and `/work/nicola` hero visual.
 - `public/assets/projects/ai-flooring-visualizer.png` → Home Selected Work, `/work`, and `/work/ai-flooring-visualizer` hero visual.
-- `public/assets/fahim-workbench.jpg` → `/about` identity visual only; it is not presented as client or project proof.
+- `public/assets/faisal-workbench.jpg` → Home Workbench identity visual only; it is not presented as client or project proof.
+- `public/assets/about/portrait-profile.png` → `/about` profile visual, used unchanged.
+- `public/assets/about/portrait-smile.png` → `/contact` human context visual, used unchanged.
 
 The project data module at `content/projects.ts` is the reusable implementation layer for the three extracted source documents. The Contact page intentionally has no email, social URL, submission form, or backend because no verified contact method was supplied.

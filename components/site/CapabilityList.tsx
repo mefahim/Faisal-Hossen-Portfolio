@@ -3,7 +3,7 @@ import { capabilities } from "@/content/site";
 
 export function CapabilityList() {
   return (
-    <div className="capability-list" aria-label="Fahim capabilities">
+    <div className="capability-list" aria-label="Faisal Hossen capabilities">
       {capabilities.map((capability) => (
         <article className="capability-row" key={capability.name}>
           <span className="capability-mark">{capability.mark}</span>

@@ -1,5 +1,5 @@
 export const site = {
-  name: "Fahim",
+  name: "Faisal Hossen",
   label: "Independent Web Developer",
   positioning: "I don't just build websites. I solve digital problems.",
   supporting:

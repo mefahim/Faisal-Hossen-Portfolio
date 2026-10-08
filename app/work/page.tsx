@@ -16,7 +16,7 @@ export const metadata: Metadata = createPageMetadata({
 const structuredData = {
   "@context": "https://schema.org",
   "@type": "CollectionPage",
-  name: "Selected Work — Fahim",
+  name: "Selected Work — Faisal Hossen",
   description: "A selection of verified project notes covering web experiences, reusable systems, and interactive product work.",
   hasPart: projects.map((project) => ({
     "@type": "CreativeWork",

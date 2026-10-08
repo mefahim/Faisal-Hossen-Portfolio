@@ -1,6 +1,6 @@
-# Fahim — Digital Problem Solver
+# Faisal Hossen — Digital Problem Solver
 
-A Next.js App Router portfolio for Fahim’s independent digital problem-solving practice.
+A Next.js App Router portfolio for Faisal Hossen’s independent digital problem-solving practice.
 
 ## Run locally
 

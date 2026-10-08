@@ -1,4 +1,4 @@
-# Fahim — Personal Digital HQ: Phase 1 Plan
+# Faisal Hossen — Personal Digital HQ: Phase 1 Plan
 
 ## Source of truth
 
@@ -8,13 +8,13 @@
 
 ## Phase boundary
 
-This phase delivers a credible first surface of the product, not a complete portfolio. It will establish the visual language and prove Fahim’s positioning without inventing clients, outcomes, metrics, testimonials, awards, or project evidence. It includes:
+This phase delivers a credible first surface of the product, not a complete portfolio. It will establish the visual language and prove Faisal Hossen’s positioning without inventing clients, outcomes, metrics, testimonials, awards, or project evidence. It includes:
 
 1. Next.js App Router foundation with TypeScript and Tailwind CSS.
 2. Editorial/product design system, typography, color tokens, spacing, radii, focus states, and reduced-motion behavior.
 3. Responsive global shell: wordmark, desktop navigation, mobile navigation, footer, CTA primitives, tags, section heading, and page transition/reveal primitives.
 4. Home page narrative: problem → thinking → proof → capability → trust → action.
-5. A non-fabricated Workbench/Problem Playground that demonstrates how Fahim frames digital problems, using only supplied identity imagery and clearly labelled thinking states.
+5. A non-fabricated Workbench/Problem Playground that demonstrates how Faisal Hossen frames digital problems, using only supplied identity imagery and clearly labelled thinking states.
 6. Initial SEO metadata, canonical placeholder policy, Open Graph/Twitter structure, sitemap, robots, structured data, and `public/manus-routes.json`.
 7. Responsive/accessibility foundation for 360–1600px layouts.
 8. A Phase 1 report and approval gate before any Phase 2 implementation.
@@ -32,7 +32,7 @@ Phase 1 only implements `/`. The global shell uses clearly marked next-phase nav
 
 ### Home narrative
 
-1. **Quiet top bar:** Fahim wordmark, concise navigation, restrained project CTA.
+1. **Quiet top bar:** Faisal Hossen wordmark, concise navigation, restrained project CTA.
 2. **Hero:** “I don't just build websites. I solve digital problems.” plus the supplied supporting statement and two CTAs.
 3. **Workbench:** visual proof of a problem-solving mindset, not a claim of client results. A real supplied portrait anchors the human side; small system labels show “Frame the problem”, “Make the next step clear”, and “Build for the people using it”.
 4. **Proof without theatre:** honest statement that the site is being built as a product demonstration, with no invented metrics or testimonials.
@@ -107,7 +107,7 @@ Use `Inter` for interface clarity and `DM Sans` for display/supporting warmth, l
 
 ### Wordmark and logo concept
 
-Use a typographic **FAHIM ·** wordmark with a small chartreuse diagnostic dot. The dot represents a point of attention or the next useful question; it is not a decorative icon. A future logo asset can replace the CSS wordmark in Phase 2 without changing the shell.
+Use a typographic **FAISAL HOSSEN ·** wordmark with a small chartreuse diagnostic dot. The dot represents a point of attention or the next useful question; it is not a decorative icon. A future logo asset can replace the CSS wordmark in Phase 2 without changing the shell.
 
 ### Signature brand color
 
@@ -121,7 +121,7 @@ Use a typographic **FAHIM ·** wordmark with a small chartreuse diagnostic dot. 
 - **Icons:** Lucide React, limited to meaningful navigation and directional affordances.
 - **Content/data:** `/content/site.ts` for voice, capabilities, problem states, and route metadata; future project data belongs in `/content/projects.ts` without mixing content into layout components.
 - **Reusable UI:** `/components/site` for Header, MobileNav, Footer, Button, SectionHeading, Chip, Reveal, Workbench, ProblemPlayground, CapabilityList, and CTA.
-- **Public assets:** the supplied Phase 1 portrait is kept as a small project-local `public/assets/fahim-workbench.jpg` so the direct Preview dev port renders it reliably; the managed `/manus-storage/...` upload remains available as a durable project-storage backup. Future supplied assets should follow the same evidence-first mapping.
+- **Public assets:** the supplied Phase 1 portrait is kept as a small project-local `public/assets/faisal-workbench.jpg` so the direct Preview dev port renders it reliably; the managed `/manus-storage/...` upload remains available as a durable project-storage backup. Additional supplied portraits are used unchanged on About and Contact, following the same evidence-first mapping.
 - **SEO:** `app/layout.tsx` metadata base and social defaults; route-specific metadata in route files; `app/sitemap.ts`, `app/robots.ts`, JSON-LD for Person/WebSite/ProfessionalService where claims are supported; `public/manus-routes.json` synchronized with implemented routes.
 - **Serving:** local development listens on the managed runtime port `3000` at `0.0.0.0`; Preview is the authoritative visual surface.
 - **Future contact:** Phase 1 uses a non-submitting CTA placeholder until a verified public email/contact URL is provided. No server/database is enabled in this phase.

@@ -7,8 +7,8 @@ export function Footer() {
     <footer className="site-footer">
       <div className="footer-top">
         <div>
-          <Link className="wordmark footer-wordmark" href="/" aria-label="Fahim home">
-            FAHIM<span aria-hidden="true">·</span>
+          <Link className="wordmark footer-wordmark" href="/" aria-label="Faisal Hossen home">
+            FAISAL HOSSEN<span aria-hidden="true">·</span>
           </Link>
           <p className="footer-note">A calm digital partner for problems worth solving.</p>
         </div>
