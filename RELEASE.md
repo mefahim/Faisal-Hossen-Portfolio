@@ -6,6 +6,10 @@
 **Server requirement:** Enabled because `/api/contact` is a server route  
 **Database:** Not required
 
+## Hostinger LiteSpeed deployment
+
+The production build is configured with `output: "standalone"` in `next.config.ts`, so it can run behind Hostinger LiteSpeed Passenger on Node.js 22. The deployed process uses the generated `.next/standalone/server.js`, copies `.next/static` and `public`, and serves through the domain’s Passenger `.htaccess` mapping. A timestamped backup of the previous `public_html` was created before the first deployment.
+
 ## Deploy
 
 Use the repository root as the hosting project directory. Install dependencies, build the application, and run the Next.js server:
