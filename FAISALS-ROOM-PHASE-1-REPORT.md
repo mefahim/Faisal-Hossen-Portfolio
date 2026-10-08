@@ -130,3 +130,17 @@ Resolve any migration/seed error before proceeding. Record the migration output,
 ## Phase boundaries and next authorization
 
 Phase 1 is implemented in source but **acceptance remains pending** as described above. Phase 2’s Google connections, analytics data, expanded SEO audits, redirects and advanced lead workflow remain untouched. Phase 3’s complete revision browser, backups, scheduled automation, monitoring and future modules remain untouched. Ask Faisal for separate approval before starting either phase.
+
+### Acceptance audit — 2026-10-08
+
+The current `main` branch was audited from a clean checkout at handoff revision `54d54f0`. No source redesign or Phase 2/Phase 3 work was started. The following checks were re-run in this sandbox:
+
+- `pnpm install --frozen-lockfile` — passed.
+- `pnpm typecheck` — passed.
+- `pnpm test` — passed, 6/6 tests.
+- `pnpm build` — passed; standalone output generated the public routes, all Phase 1 private routes, and API routes.
+- Standalone release smoke test after copying `public/` and `.next/static/` — passed: `/`, `/work`, `/work/peoria-hardwood-floors`, `/about`, `/contact`, `/robots.txt`, and `/sitemap.xml` returned 200; anonymous `/faisals-room` returned 307 to `/faisals-room/login`.
+- Security smoke test — passed: cross-origin content mutation returned 403 and same-origin unauthenticated content mutation returned 401.
+- Public crawl check — passed: robots excludes `/api/` and `/faisals-room`; sitemap contained no private/API route.
+
+The required acceptance environment was not available in this session: no `DATABASE_URL`/PostgreSQL service, verified production `NEXT_PUBLIC_SITE_URL`, operator-provided owner bootstrap input, deployment-host access, or provider-confirmed durable `MEDIA_STORAGE_DIR` was present. Playwright/browser automation was also not installed. Therefore migration/seed parity, authenticated workflows, contact persistence, media restart durability, production-origin browser review, accessibility review, and viewport review remain unexecuted—not passed.
