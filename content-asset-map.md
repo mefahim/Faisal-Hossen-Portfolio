@@ -32,3 +32,12 @@ Source folder: Google Drive folder `1CUIGAx67rFEd8ThLkvTDmEXFbC8KWoBq`
 - Do not use any portrait as evidence of a client engagement or project outcome.
 - Do not generate a lookalike of Fahim or alter identity characteristics.
 - Missing verified contact email/social URLs and performance data remain explicit limitations.
+
+## Phase 2 implementation placements
+
+- `public/assets/projects/peoria-hardwood-floors.png` → Home Selected Work, `/work`, and `/work/peoria-hardwood-floors` hero visual.
+- `public/assets/projects/nicola.png` → Home Selected Work, `/work`, and `/work/nicola` hero visual.
+- `public/assets/projects/ai-flooring-visualizer.png` → Home Selected Work, `/work`, and `/work/ai-flooring-visualizer` hero visual.
+- `public/assets/fahim-workbench.jpg` → `/about` identity visual only; it is not presented as client or project proof.
+
+The project data module at `content/projects.ts` is the reusable implementation layer for the three extracted source documents. The Contact page intentionally has no email, social URL, submission form, or backend because no verified contact method was supplied.

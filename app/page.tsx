@@ -4,9 +4,11 @@ import { CapabilityList } from "@/components/site/CapabilityList";
 import { Footer } from "@/components/site/Footer";
 import { Header } from "@/components/site/Header";
 import { ProblemPlayground } from "@/components/site/ProblemPlayground";
+import { ProjectGrid } from "@/components/site/ProjectGrid";
 import { Reveal } from "@/components/site/Reveal";
 import { SectionHeading } from "@/components/site/SectionHeading";
 import { Workbench } from "@/components/site/Workbench";
+import { projects } from "@/content/projects";
 import { site, thinkingPrinciples } from "@/content/site";
 
 const structuredData = {
@@ -45,8 +47,8 @@ export default function HomePage() {
             </Reveal>
             <Reveal delay={0.15}>
               <div className="hero-actions">
-                <Button href="#contact">Start a project</Button>
-                <Button href="#selected-work" variant="secondary">Explore my work</Button>
+                <Button href="/contact">Start a project</Button>
+                <Button href="/work" variant="secondary">Explore my work</Button>
               </div>
             </Reveal>
             <Reveal delay={0.2}>
@@ -154,15 +156,23 @@ export default function HomePage() {
           </div>
         </section>
 
-        <section className="section-shell preview-section" id="selected-work" aria-labelledby="selected-work-title">
-          <div className="preview-number">05</div>
-          <div className="preview-copy">
-            <p className="eyebrow">Selected work / next phase</p>
-            <h2 id="selected-work-title">The proof library is next.</h2>
-            <p>Real project stories belong here — with the problem, constraints, approach, and verified outcome. Until those materials are supplied, this space stays honest.</p>
-            <span className="preview-status"><span className="status-dot" aria-hidden="true" /> Waiting for verified project evidence</span>
+        <section className="section-shell selected-work-section" id="selected-work" aria-labelledby="selected-work-title">
+          <div className="section-rail">
+            <span className="eyebrow">05 / selected work</span>
+            <span className="rail-rule" aria-hidden="true" />
+            <span className="rail-caption">Real project notes, kept honest.</span>
           </div>
-          <div className="preview-arrow" aria-hidden="true"><ArrowDownRight size={34} strokeWidth={1.2} /></div>
+          <div className="section-main">
+            <Reveal>
+              <SectionHeading
+                eyebrow="Project notes"
+                title="Useful work, in three different shapes."
+                body="A flooring website, a therapist experience, and an AI product flow. Start with the case study that feels closest to the problem in front of you."
+              />
+            </Reveal>
+            <Reveal delay={0.08}><ProjectGrid projects={projects} className="home-project-grid" /></Reveal>
+            <div className="section-action"><Button href="/work" variant="secondary">See all project notes</Button></div>
+          </div>
         </section>
 
         <section className="section-shell about-preview" id="about-preview" aria-labelledby="about-preview-title">
@@ -173,6 +183,7 @@ export default function HomePage() {
           <div className="about-preview-copy">
             <p>There is a person behind the systems: curious, practical, and interested in the details that make a digital experience feel easy.</p>
             <span className="inline-note"><Globe2 aria-hidden="true" size={16} /> Independent · worldwide</span>
+            <Button href="/about" variant="text">Read about the practice</Button>
           </div>
         </section>
 
@@ -183,7 +194,7 @@ export default function HomePage() {
               <h2 id="contact-title">Have a problem<br /><em>worth solving?</em></h2>
               <p className="cta-supporting">No pressure. No complicated pitch. Just a conversation about the problem.</p>
               <div className="cta-actions">
-                <a className="button button-primary" href="#contact-note"><span>Contact details</span><ArrowRight aria-hidden="true" size={16} /></a>
+                <Button href="/contact">Contact page</Button>
                 <span className="cta-note" id="contact-note">{site.contactPlaceholder}</span>
               </div>
             </Reveal>

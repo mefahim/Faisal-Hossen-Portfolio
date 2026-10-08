@@ -6,9 +6,10 @@ import { useState } from "react";
 import { Button } from "./Button";
 
 const links = [
-  { href: "#top", label: "Home" },
-  { href: "#selected-work", label: "Work" },
-  { href: "#about-preview", label: "About" },
+  { href: "/", label: "Home" },
+  { href: "/work", label: "Work" },
+  { href: "/about", label: "About" },
+  { href: "/contact", label: "Contact" },
 ];
 
 export function Header() {
@@ -17,7 +18,7 @@ export function Header() {
   return (
     <header className="site-header">
       <div className="header-inner">
-        <Link className="wordmark" href="#top" aria-label="Fahim home">
+        <Link className="wordmark" href="/" aria-label="Fahim home">
           FAHIM<span aria-hidden="true">·</span>
         </Link>
 
@@ -30,7 +31,7 @@ export function Header() {
         </nav>
 
         <div className="header-actions">
-          <Link className="header-project-link" href="#contact">
+          <Link className="header-project-link" href="/contact">
             Start a project <span aria-hidden="true">↗</span>
           </Link>
           <button
@@ -56,7 +57,7 @@ export function Header() {
               </Link>
             ))}
           </nav>
-          <Button href="#contact" variant="primary" className="mobile-nav-cta" onClick={() => setOpen(false)}>
+          <Button href="/contact" variant="primary" className="mobile-nav-cta" onClick={() => setOpen(false)}>
             Start a project
           </Button>
         </div>

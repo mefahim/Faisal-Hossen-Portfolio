@@ -1,1 +1,9 @@
-{"routes":[{"path":"/","title":"Fahim — Digital Problem Solver"}]}
+{
+  "routes": [
+    {"path":"/","title":"Fahim — Digital Problem Solver"},
+    {"path":"/work","title":"Selected Work — Fahim"},
+    {"path":"/work/:slug","title":"Project Case Study — Fahim"},
+    {"path":"/about","title":"About Fahim"},
+    {"path":"/contact","title":"Contact Fahim"}
+  ]
+}

@@ -1,4 +1,4 @@
-# Fahim Personal Website — Phase 1 Outcomes
+# Fahim Personal Website — Phase 1 + Phase 2 Outcomes
 
 ## Phase 1 — Foundation, Design System, and Home
 
@@ -13,6 +13,21 @@
 - [x] **Implement production SEO foundation: route-aware title/description, canonical policy using the configured public origin only, Open Graph and Twitter metadata structure, sitemap, robots, semantic heading hierarchy, meaningful image alt text, appropriate JSON-LD, and a valid `GET /manus-routes.json` route manifest for all implemented routes.**
 - [x] **Run diagnostics, build checks, route/metadata checks, responsive review, accessibility review, and a critical comparison against the Notion specification; produce a Phase 1 completion report and stop for user approval before starting `/work`, `/work/[slug]`, `/about`, or Phase 3.**
 
-## Phase gate
+## Phase 2 — Real Projects, Work, About, and Contact
 
-Phase 2 must not start until the Phase 1 report is delivered and the user explicitly approves continuing.
+- [x] **Integrate exactly the three supplied projects — Peoria Hardwood Floors, Nicola, and AI Flooring Visualizer — using only the committed source JSON documents and PNG assets; preserve verified-content boundaries and do not invent metrics, testimonials, awards, certifications, dates, client outcomes, email addresses, social links, or unverified live URLs.**
+- [x] **Build `/work` with the existing Header/Footer and editorial product design system, three reusable project cards, meaningful image alt text, truthful descriptions, focus tags, and links to each dynamic case-study route.**
+- [x] **Build `/work/[slug]` with static project params, `notFound()` for unknown slugs, route-specific metadata, JSON-LD, project metadata, supplied hero imagery, challenge/problem, solution/build list, approach/flow, non-metric experience-change section, next-project navigation, and verified external links only for Peoria and Nicola.**
+- [x] **Replace the temporary Home Selected Work preview with exactly the three real projects while preserving the no-invented-numbers trust language and keeping the Home page as an entry point rather than a full case-study archive.**
+- [x] **Build `/about` with truthful positioning, web/product/UX/AI/automation/SEO explanation, the supplied identity portrait used appropriately, working principles, and links to Work and Contact without inventing biography details or performance claims.**
+- [x] **Build `/contact` as a useful transparent page with welcome problem types, verified-contact placeholder language, links to Work/About, and no fake form submission, email service, database, authentication, or backend.**
+- [x] **Preserve the Phase 1 palette, typography, responsive behavior, accessibility rules, reduced-motion behavior, Server Component default, and reusable component structure.**
+- [x] **Update `public/manus-routes.json`, `app/sitemap.ts`, `app/robots.ts` as appropriate, `TODO.md`, `content-asset-map.md`, `README.md`, and add `PHASE-2-REPORT.md`.**
+- [x] **Run and record final TypeScript, production build, HTTP route/image/404 checks, raw HTML metadata/JSON-LD checks, responsive review, and console-error review before delivery.**
+- [x] **Commit all changes with `Integrate real projects and add work about contact routes` and push the current repository `main` branch without force-pushing or starting Phase 3 deployment/publishing.**
+
+## Remaining verified inputs
+
+- A current public contact method (email or URL) is still needed before the Contact placeholder can become an actionable destination.
+- A real production origin is still needed for absolute canonical, sitemap, and social URLs.
+- AI Flooring Visualizer still has no verified public live URL in the supplied source.
