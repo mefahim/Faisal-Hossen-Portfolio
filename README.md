@@ -11,7 +11,7 @@ pnpm dev
 
 Open `http://localhost:3000`.
 
-Set `NEXT_PUBLIC_SITE_URL` to the real public production origin before production so canonical, sitemap, and social URLs are absolute. The current repository intentionally leaves this unset until a verified production origin is supplied.
+Set `NEXT_PUBLIC_SITE_URL` to the real public production origin before production so canonical, sitemap, and social URLs are absolute. For real form delivery, configure `RESEND_API_KEY`, `CONTACT_EMAIL`, and a verified `CONTACT_FROM_EMAIL` on the hosting provider. Secrets are read only by `/api/contact` and are never bundled into the browser.
 
 ## Routes
 
@@ -21,7 +21,7 @@ Set `NEXT_PUBLIC_SITE_URL` to the real public production origin before productio
 - `/work/nicola` — Nicola case study
 - `/work/ai-flooring-visualizer` — AI Flooring Visualizer case study
 - `/about` — About the practice and working principles
-- `/contact` — Transparent contact page; no unverified email, social link, or fake form is included
+- `/contact` — Functional contact form with server validation, verified phone/social links, and environment-based email delivery
 
 ## Evidence-led project content
 
@@ -32,7 +32,7 @@ Only these verified live URLs are shown:
 - <https://peoriahardwoodfloors.com>
 - <https://faisalhossen.com/nicolav1/>
 
-No public live URL was supplied for AI Flooring Visualizer, so the site does not invent one. No metrics, testimonials, awards, certifications, dates, client outcomes, email addresses, or social links are claimed.
+No public live URL was supplied for AI Flooring Visualizer, so the site does not invent one. No metrics, testimonials, awards, certifications, dates, client outcomes, or email addresses are claimed. The supplied phone and exact social URLs are documented in the final refinement report.
 
 ## Reports and continuation notes
 
@@ -40,3 +40,5 @@ No public live URL was supplied for AI Flooring Visualizer, so the site does not
 - [`PHASE-2-REPORT.md`](./PHASE-2-REPORT.md) — real projects, Work, About, Contact, and remaining limitations
 - [`PHASE-2-HANDOFF.md`](./PHASE-2-HANDOFF.md) — continuation brief and source evidence
 - [`content-asset-map.md`](./content-asset-map.md) — source-to-local asset mapping
+- [`FINAL-REFINEMENT-REPORT.md`](./FINAL-REFINEMENT-REPORT.md) — Work card, contact, form, QA, and screenshot report
+- [`RELEASE.md`](./RELEASE.md) — hosting deployment handoff and environment configuration

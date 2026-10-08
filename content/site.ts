@@ -6,7 +6,17 @@ export const site = {
     "I design and build thoughtful digital solutions that help businesses save time, simplify workflows, and create better experiences for their customers.",
   context: "Working with clients worldwide",
   capabilities: ["Web", "Digital Products", "AI", "Automation", "UX", "SEO"],
-  contactPlaceholder: "Your preferred contact link will be added once verified.",
+};
+
+export const contactDetails = {
+  phone: "+8801815676523",
+  phoneHref: "tel:+8801815676523",
+  socialLinks: [
+    { label: "Facebook", href: "https://faisalhossen.com/facebook" },
+    { label: "Instagram", href: "https://faisalhossen.com/instagram" },
+    { label: "GitHub", href: "https://faisalhossen.com/github" },
+    { label: "LinkedIn", href: "https://faisalhossen.com/linkedin" },
+  ],
 };
 
 export const problemStates = [

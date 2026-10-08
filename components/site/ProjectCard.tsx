@@ -16,19 +16,20 @@ export function ProjectCard({ project, featured = false }: ProjectCardProps) {
           src={project.image}
           alt={project.imageAlt}
           fill
+          priority={featured}
           sizes={featured ? "(max-width: 800px) 100vw, 66vw" : "(max-width: 800px) 100vw, 33vw"}
           className="project-card-image-content"
         />
-        <span className="project-card-index">{project.number}</span>
         <span className="project-card-arrow" aria-hidden="true"><ArrowUpRight size={18} /></span>
       </Link>
       <div className="project-card-body">
-        <div className="project-card-heading">
-          <div>
-            <p className="eyebrow">{project.category}</p>
-            <h3><Link href={`/work/${project.slug}`}>{project.title}</Link></h3>
-          </div>
+        <div className="project-card-meta">
+          <span className="project-card-number">{project.number} /</span>
+          <span className="eyebrow">{project.category}</span>
           <span className="project-card-type">{project.type}</span>
+        </div>
+        <div className="project-card-heading">
+          <h3><Link href={`/work/${project.slug}`}>{project.title}</Link></h3>
         </div>
         <p className="project-card-summary">{project.summary}</p>
         <div className="project-tags" aria-label={`${project.title} focus areas`}>

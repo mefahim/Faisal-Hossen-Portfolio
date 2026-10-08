@@ -124,7 +124,7 @@ Use a typographic **FAISAL HOSSEN ·** wordmark with a small chartreuse diagnost
 - **Public assets:** the supplied Phase 1 portrait is kept as a small project-local `public/assets/faisal-workbench.jpg` so the direct Preview dev port renders it reliably; the managed `/manus-storage/...` upload remains available as a durable project-storage backup. Additional supplied portraits are used unchanged on About and Contact, following the same evidence-first mapping.
 - **SEO:** `app/layout.tsx` metadata base and social defaults; route-specific metadata in route files; `app/sitemap.ts`, `app/robots.ts`, JSON-LD for Person/WebSite/ProfessionalService where claims are supported; `public/manus-routes.json` synchronized with implemented routes.
 - **Serving:** local development listens on the managed runtime port `3000` at `0.0.0.0`; Preview is the authoritative visual surface.
-- **Future contact:** Phase 1 uses a non-submitting CTA placeholder until a verified public email/contact URL is provided. No server/database is enabled in this phase.
+- **Contact delivery:** The final refinement uses a client-side accessible form posting to `/api/contact`; the server capability is enabled, while email delivery remains environment-based through `RESEND_API_KEY` and `CONTACT_EMAIL` and never exposes secrets to the browser.
 
 ## Asset and content mapping
 
@@ -141,3 +141,17 @@ Use a typographic **FAISAL HOSSEN ·** wordmark with a small chartreuse diagnost
 ## Acceptance interpretation
 
 A successful Phase 1 is a coherent, responsive, accessible Home experience with the above content boundaries, no unsupported claims, no broken primary navigation, meaningful interactions, initial SEO files, route manifest, and a clean build. The Phase 1 completion report will explicitly list what is delivered, what remains missing, and the approval gate before Phase 2.
+
+## Final UI refinement implementation
+
+- **Design movement:** editorial product portfolio; restrained Swiss-inspired structure with human image-led moments and a calm, premium rhythm.
+- **Core principles:** evidence before decoration, generous hierarchy, precise metadata, and interaction that rewards attention without demanding it.
+- **Color philosophy:** warm ivory and ink keep the work readable and grounded; muted green-gray supports calm context; diagnostic chartreuse marks active states and the next useful action.
+- **Layout paradigm:** asymmetrical editorial split layouts with one featured project followed by a two-column supporting rhythm; contact keeps the form primary and social links secondary.
+- **Signature elements:** numbered project index, image-corner action marker, and thin rules that make each content layer feel deliberate.
+- **Interaction philosophy:** subtle image scale, arrow movement, clear focus states, and no hover-only information; all essential content remains visible on touch devices.
+- **Animation:** short, quiet transforms only; preserve the existing reduced-motion behavior and avoid autoplay, glow, 3D, or decorative effects.
+- **Typography:** existing display/sans pairing remains; headings carry the editorial voice while labels, types, and focus tags provide precise scanning cues.
+- **Brand essence:** Faisal Hossen is a calm digital problem solver for people who need clearer websites, products, workflows, and next steps; thoughtful, practical, quietly confident.
+- **Contact architecture:** `/contact` owns the primary form and exact supplied phone/social links; `app/api/contact/route.ts` validates and sends through Resend only when environment variables are configured, otherwise returns an honest setup message for the UI.
+- **QA artifacts:** capture full-page desktop/mobile screenshots for Home, Work, all three case studies, About, and Contact, plus contact form default/validation states; store a concise release note and screenshot index in `RELEASE.md`.

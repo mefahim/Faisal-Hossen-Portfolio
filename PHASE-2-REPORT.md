@@ -24,7 +24,7 @@ Phase 2 is implemented in the existing Next.js App Router project. The three sup
 - `/work/nicola` — Nicola case study.
 - `/work/ai-flooring-visualizer` — AI Flooring Visualizer case study.
 - `/about` — Positioning, working style, principles, and links to Work/Contact.
-- `/contact` — Useful contact context with an explicit unverified-contact placeholder; no fake form or backend.
+- `/contact` — Functional contact form with exact verified phone/social links and an environment-based email API route.
 
 ## Content and evidence handling
 
@@ -32,7 +32,7 @@ Phase 2 is implemented in the existing Next.js App Router project. The three sup
 - Supplied project PNGs are reused at their committed public paths with meaningful alt text and responsive `next/image` rendering.
 - Verified external links used only for Peoria Hardwood Floors (`https://peoriahardwoodfloors.com`) and Nicola (`https://faisalhossen.com/nicolav1/`).
 - AI Flooring Visualizer has no public live URL in the supplied source, so no live-site link is shown.
-- No metrics, testimonials, awards, certifications, dates, client outcomes, email address, social links, or unverified URLs were added.
+- No metrics, testimonials, awards, certifications, dates, client outcomes, or invented email address were added; the exact supplied phone/social URLs are now used.
 - Supplied Faisal Hossen portraits are used unchanged as identity visuals on About and Contact only, not as project proof; no face or identity editing was performed.
 
 ## SEO and accessibility updates
@@ -58,9 +58,9 @@ Phase 2 is implemented in the existing Next.js App Router project. The three sup
 - Browser Preview review — About and Contact rendered with the Faisal Hossen wordmark, supplied portraits, expected page hierarchy, and no horizontal overflow at the available 1280px viewport; the responsive CSS includes intentional single-column behavior below 800px and compact card/header rules below 480px.
 - No type, build, runtime, or observed Preview console errors remained during validation.
 
-## Remaining missing verified content
+## Remaining production configuration
 
-- No verified public email, contact URL, or social URL was present in the source material, so `/contact` intentionally remains a transparent placeholder.
+- The final refinement adds the supplied phone and exact social URLs. A public email address is still not invented; email delivery requires the hosting environment variables documented in `RELEASE.md`.
 - `NEXT_PUBLIC_SITE_URL` is still not configured in the repository; absolute canonical/sitemap/social URLs remain unset until a real production origin is supplied.
 - No verified project metrics, testimonials, awards, certifications, dates, or measurable client outcomes were supplied; none are claimed.
 - AI Flooring Visualizer has no verified public live URL.

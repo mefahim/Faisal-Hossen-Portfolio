@@ -9,7 +9,7 @@ import { Reveal } from "@/components/site/Reveal";
 import { SectionHeading } from "@/components/site/SectionHeading";
 import { Workbench } from "@/components/site/Workbench";
 import { projects } from "@/content/projects";
-import { site, thinkingPrinciples } from "@/content/site";
+import { contactDetails, site, thinkingPrinciples } from "@/content/site";
 
 const structuredData = {
   "@context": "https://schema.org",
@@ -195,7 +195,7 @@ export default function HomePage() {
               <p className="cta-supporting">No pressure. No complicated pitch. Just a conversation about the problem.</p>
               <div className="cta-actions">
                 <Button href="/contact">Contact page</Button>
-                <span className="cta-note" id="contact-note">{site.contactPlaceholder}</span>
+                <span className="cta-note" id="contact-note">Use the form or call {contactDetails.phone}.</span>
               </div>
             </Reveal>
           </div>

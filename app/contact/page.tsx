@@ -1,18 +1,25 @@
 import type { Metadata } from "next";
 import Image from "next/image";
-import { ArrowRight, Check, CircleSlash2 } from "lucide-react";
-import { Button } from "@/components/site/Button";
+import { ArrowRight, ArrowUpRight, Facebook, Github, Instagram, Linkedin, Phone } from "lucide-react";
+import { ContactForm } from "@/components/site/ContactForm";
 import { Footer } from "@/components/site/Footer";
 import { Header } from "@/components/site/Header";
 import { Reveal } from "@/components/site/Reveal";
-import { site } from "@/content/site";
+import { contactDetails } from "@/content/site";
 import { createPageMetadata } from "@/lib/metadata";
 
 export const metadata: Metadata = createPageMetadata({
   title: "Contact Faisal Hossen",
-  description: "A transparent contact page for starting a conversation about a website, product experience, AI, automation, UX, or SEO problem.",
+  description: "Start a conversation with Faisal Hossen about a website, product experience, AI, automation, UX, or SEO problem.",
   path: "/contact",
 });
+
+function SocialIcon({ label }: { label: string }) {
+  if (label === "Facebook") return <Facebook aria-hidden="true" size={17} />;
+  if (label === "Instagram") return <Instagram aria-hidden="true" size={17} />;
+  if (label === "GitHub") return <Github aria-hidden="true" size={17} />;
+  return <Linkedin aria-hidden="true" size={17} />;
+}
 
 export default function ContactPage() {
   return (
@@ -23,40 +30,58 @@ export default function ContactPage() {
           <Reveal>
             <p className="eyebrow"><span className="status-dot" aria-hidden="true" /> Contact / start with the problem</p>
             <h1>Have a problem worth solving?</h1>
-            <p className="page-hero-supporting">No pressure. No complicated pitch. Share the situation, the people involved, and the next step that feels stuck.</p>
+            <p className="page-hero-supporting">Tell me what feels stuck, who it affects, and what a better next step could look like.</p>
           </Reveal>
         </section>
 
-        <section className="section-shell contact-grid" aria-labelledby="contact-details-title">
-          <div className="contact-panel contact-panel-primary">
-            <p className="eyebrow">A transparent note</p>
-            <CircleSlash2 aria-hidden="true" size={28} strokeWidth={1.3} />
-            <h2 id="contact-details-title">The verified contact link is not in the current source material.</h2>
-            <p>{site.contactPlaceholder} This page does not submit a form or pretend to send a message anywhere.</p>
-            <div className="contact-placeholder"><span className="status-dot" aria-hidden="true" /> Contact details will be added once verified.</div>
+        <section className="section-shell contact-work-section" aria-labelledby="contact-form-title">
+          <div className="section-rail">
+            <span className="eyebrow">01 / let&apos;s talk</span>
+            <span className="rail-rule" aria-hidden="true" />
+            <span className="rail-caption">A clear first note is enough.</span>
           </div>
-          <div className="contact-panel contact-panel-secondary">
-            <div className="contact-portrait-wrap">
-              <Image src="/assets/about/portrait-smile.png" alt="Faisal Hossen standing by the sea" fill sizes="(max-width: 800px) 100vw, 35vw" className="contact-portrait" />
+          <div className="contact-work-main">
+            <div className="contact-form-intro">
+              <p className="eyebrow">Start a conversation</p>
+              <h2 id="contact-form-title">Bring the situation.<br /><em>We&apos;ll find the shape.</em></h2>
+              <p>Share a little context and I&apos;ll have a better starting point for the conversation. No complicated pitch required.</p>
             </div>
-            <p className="eyebrow">Good problems to bring</p>
-            <ul className="contact-list">
-              {[
-                "A website that needs a clearer digital front door",
-                "A product or workflow that feels harder than it should",
-                "An AI or automation idea that needs a useful shape",
-                "An experience that should be easier to find, understand, or trust",
-              ].map((item) => <li key={item}><Check aria-hidden="true" size={16} /><span>{item}</span></li>)}
-            </ul>
+            <ContactForm />
           </div>
         </section>
 
-        <section className="section-shell contact-links-section" aria-labelledby="contact-links-title">
-          <div><p className="eyebrow">While that link is being verified</p><h2 id="contact-links-title">Read the work or learn how the practice is shaped.</h2></div>
-          <div className="contact-links-actions"><Button href="/work">Explore selected work</Button><Button href="/about" variant="secondary">About Faisal Hossen</Button></div>
+        <section className="section-shell contact-details-section" aria-labelledby="contact-details-title">
+          <div className="section-rail">
+            <span className="eyebrow">02 / another way in</span>
+            <span className="rail-rule" aria-hidden="true" />
+            <span className="rail-caption">Prefer a direct line?</span>
+          </div>
+          <aside className="contact-details-card">
+            <div className="contact-portrait-wrap">
+              <Image src="/assets/about/portrait-smile.png" alt="Faisal Hossen standing by the sea" fill sizes="(max-width: 800px) 100vw, 38vw" className="contact-portrait" />
+            </div>
+            <div className="contact-details-copy">
+              <p className="eyebrow">Prefer another way?</p>
+              <h2 id="contact-details-title">A useful conversation can start simply.</h2>
+              <a className="contact-phone" href={contactDetails.phoneHref} aria-label={`Call Faisal Hossen at ${contactDetails.phone}`}>
+                <Phone aria-hidden="true" size={18} />
+                <span><small>Phone</small><strong>{contactDetails.phone}</strong></span>
+                <ArrowUpRight aria-hidden="true" size={17} />
+              </a>
+              <div className="contact-socials" aria-label="Faisal Hossen social links">
+                {contactDetails.socialLinks.map((link) => (
+                  <a key={link.label} href={link.href} target="_blank" rel="noreferrer" aria-label={`${link.label} — opens in a new tab`}>
+                    <SocialIcon label={link.label} />
+                    <span>{link.label}</span>
+                    <ArrowUpRight aria-hidden="true" size={14} />
+                  </a>
+                ))}
+              </div>
+            </div>
+          </aside>
         </section>
 
-        <section className="section-shell contact-note-band"><ArrowRight aria-hidden="true" size={18} /><p>There is no fake form, inbox, social link, or backend behind this page. The boundary is intentional until a current contact method is confirmed.</p></section>
+        <section className="section-shell contact-note-band"><ArrowRight aria-hidden="true" size={18} /><p>The form validates in the browser and on the server. Email delivery uses environment-based provider settings; no secret or invented email address is stored in the frontend.</p></section>
       </main>
       <Footer />
     </>
