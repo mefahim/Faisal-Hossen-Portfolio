@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { requireOwner, UnauthorizedError } from "@/lib/server/auth";
 import { query, transaction } from "@/lib/server/db";
@@ -25,7 +26,7 @@ export async function PATCH(request: Request) {
     await transaction(async (client) => {
       const updated = await client.query("UPDATE contact_submissions SET status=$1,updated_at=now() WHERE id=$2", [body.data.status,body.data.id]);
       if (!updated.rowCount) throw new Error("Lead was not found.");
-      await client.query("INSERT INTO activity_logs(actor_id,action,entity_type,entity_id,safe_metadata,correlation_id) VALUES($1,'lead.status_changed','lead',$2,$3::jsonb,$4)", [owner.userId,body.data.id,JSON.stringify({ status: body.data.status }),requestId]);
+      await client.query("INSERT INTO activity_logs(id,actor_id,action,entity_type,entity_id,safe_metadata,correlation_id) VALUES($1,$2,'lead.status_changed','lead',$3,$4,$5)", [randomUUID(), owner.userId,body.data.id,JSON.stringify({ status: body.data.status }),requestId]);
     });
     return NextResponse.json({ message: "Lead status updated." }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) {

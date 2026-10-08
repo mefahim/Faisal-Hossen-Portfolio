@@ -1,182 +1,192 @@
+CREATE TABLE IF NOT EXISTS schema_migrations (
+  name VARCHAR(190) PRIMARY KEY,
+  applied_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
+);
 CREATE TABLE IF NOT EXISTS users (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  email TEXT NOT NULL UNIQUE,
-  password_hash TEXT NOT NULL,
+  id CHAR(36) PRIMARY KEY,
+  email VARCHAR(320) NOT NULL UNIQUE,
+  password_hash VARCHAR(255) NOT NULL,
   is_active BOOLEAN NOT NULL DEFAULT TRUE,
-  password_changed_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  password_changed_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)
 );
-
 CREATE TABLE IF NOT EXISTS sessions (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  token_hash TEXT NOT NULL UNIQUE,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  expires_at TIMESTAMPTZ NOT NULL,
-  revoked_at TIMESTAMPTZ,
-  last_seen_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  user_agent_hash TEXT
+  id CHAR(36) PRIMARY KEY,
+  user_id CHAR(36) NOT NULL,
+  token_hash CHAR(64) NOT NULL UNIQUE,
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  expires_at DATETIME(3) NOT NULL,
+  revoked_at DATETIME(3) NULL,
+  last_seen_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  user_agent_hash CHAR(64) NULL,
+  CONSTRAINT sessions_user_fk FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  INDEX sessions_user_active_idx (user_id, expires_at)
 );
-CREATE INDEX IF NOT EXISTS sessions_user_active_idx ON sessions(user_id, expires_at) WHERE revoked_at IS NULL;
-
 CREATE TABLE IF NOT EXISTS site_settings (
-  id TEXT PRIMARY KEY DEFAULT 'default' CHECK (id = 'default'),
-  draft JSONB NOT NULL,
-  published JSONB,
-  status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'published')),
-  draft_updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  published_at TIMESTAMPTZ,
-  published_revision_id UUID
+  id VARCHAR(32) PRIMARY KEY,
+  draft JSON NOT NULL,
+  published JSON NULL,
+  status VARCHAR(16) NOT NULL DEFAULT 'draft',
+  draft_updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  published_at DATETIME(3) NULL,
+  published_revision_id CHAR(36) NULL,
+  CHECK (status IN ('draft','published'))
 );
-
 CREATE TABLE IF NOT EXISTS pages (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  key TEXT NOT NULL UNIQUE,
-  route TEXT NOT NULL UNIQUE,
-  title TEXT NOT NULL,
-  status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'published', 'archived')),
-  draft JSONB NOT NULL,
-  published JSONB,
-  published_revision_id UUID,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  published_at TIMESTAMPTZ
+  id CHAR(36) PRIMARY KEY,
+  `key` VARCHAR(100) NOT NULL UNIQUE,
+  route VARCHAR(255) NOT NULL UNIQUE,
+  title VARCHAR(180) NOT NULL,
+  status VARCHAR(16) NOT NULL DEFAULT 'draft',
+  draft JSON NOT NULL,
+  published JSON NULL,
+  published_revision_id CHAR(36) NULL,
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  published_at DATETIME(3) NULL,
+  CHECK (status IN ('draft','published','archived'))
 );
 CREATE TABLE IF NOT EXISTS page_sections (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  page_id UUID NOT NULL REFERENCES pages(id) ON DELETE CASCADE,
-  section_key TEXT NOT NULL,
-  section_type TEXT NOT NULL,
-  position INTEGER NOT NULL DEFAULT 0,
-  status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'published', 'archived')),
-  draft JSONB NOT NULL,
-  published JSONB,
-  UNIQUE(page_id, section_key)
+  id CHAR(36) PRIMARY KEY,
+  page_id CHAR(36) NOT NULL,
+  section_key VARCHAR(80) NOT NULL,
+  section_type VARCHAR(80) NOT NULL,
+  position INT NOT NULL DEFAULT 0,
+  status VARCHAR(16) NOT NULL DEFAULT 'draft',
+  draft JSON NOT NULL,
+  published JSON NULL,
+  UNIQUE KEY page_section_unique (page_id, section_key),
+  CONSTRAINT page_sections_page_fk FOREIGN KEY (page_id) REFERENCES pages(id) ON DELETE CASCADE,
+  CHECK (status IN ('draft','published','archived'))
 );
-
 CREATE TABLE IF NOT EXISTS projects (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  slug TEXT NOT NULL UNIQUE,
-  status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'published', 'archived')),
-  position INTEGER NOT NULL DEFAULT 0,
-  draft JSONB NOT NULL,
-  published JSONB,
-  published_revision_id UUID,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  published_at TIMESTAMPTZ
+  id CHAR(36) PRIMARY KEY,
+  slug VARCHAR(100) NOT NULL UNIQUE,
+  status VARCHAR(16) NOT NULL DEFAULT 'draft',
+  position INT NOT NULL DEFAULT 0,
+  draft JSON NOT NULL,
+  published JSON NULL,
+  published_revision_id CHAR(36) NULL,
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  published_at DATETIME(3) NULL,
+  CHECK (status IN ('draft','published','archived'))
 );
 CREATE TABLE IF NOT EXISTS media (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  storage_key TEXT NOT NULL UNIQUE,
-  mime_type TEXT NOT NULL CHECK (mime_type IN ('image/jpeg', 'image/png', 'image/webp', 'image/avif')),
-  byte_size BIGINT NOT NULL CHECK (byte_size > 0 AND byte_size <= 10485760),
-  width INTEGER NOT NULL CHECK (width > 0),
-  height INTEGER NOT NULL CHECK (height > 0),
-  checksum_sha256 TEXT NOT NULL,
-  alt_text TEXT NOT NULL,
-  focal_x NUMERIC(4,3) NOT NULL DEFAULT 0.5 CHECK (focal_x BETWEEN 0 AND 1),
-  focal_y NUMERIC(4,3) NOT NULL DEFAULT 0.5 CHECK (focal_y BETWEEN 0 AND 1),
-  derivatives JSONB NOT NULL DEFAULT '{}'::jsonb,
-  processing_state TEXT NOT NULL DEFAULT 'ready' CHECK (processing_state IN ('processing', 'ready', 'failed')),
-  archived_at TIMESTAMPTZ,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  id CHAR(36) PRIMARY KEY,
+  storage_key VARCHAR(500) NOT NULL UNIQUE,
+  mime_type VARCHAR(40) NOT NULL,
+  byte_size BIGINT NOT NULL,
+  width INT NOT NULL,
+  height INT NOT NULL,
+  checksum_sha256 CHAR(64) NOT NULL,
+  alt_text VARCHAR(500) NOT NULL,
+  focal_x DECIMAL(4,3) NOT NULL DEFAULT 0.5,
+  focal_y DECIMAL(4,3) NOT NULL DEFAULT 0.5,
+  derivatives JSON NOT NULL,
+  processing_state VARCHAR(16) NOT NULL DEFAULT 'ready',
+  archived_at DATETIME(3) NULL,
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  CHECK (mime_type IN ('image/jpeg','image/png','image/webp','image/avif')),
+  CHECK (byte_size > 0 AND byte_size <= 10485760),
+  CHECK (width > 0 AND height > 0),
+  CHECK (focal_x BETWEEN 0 AND 1 AND focal_y BETWEEN 0 AND 1),
+  CHECK (processing_state IN ('processing','ready','failed'))
 );
 CREATE TABLE IF NOT EXISTS project_media (
-  project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-  media_id UUID NOT NULL REFERENCES media(id) ON DELETE RESTRICT,
-  role TEXT NOT NULL DEFAULT 'gallery',
-  position INTEGER NOT NULL DEFAULT 0,
-  alt_text TEXT NOT NULL,
-  focal_x NUMERIC(4,3) NOT NULL DEFAULT 0.5 CHECK (focal_x BETWEEN 0 AND 1),
-  focal_y NUMERIC(4,3) NOT NULL DEFAULT 0.5 CHECK (focal_y BETWEEN 0 AND 1),
-  PRIMARY KEY(project_id, media_id, role)
+  project_id CHAR(36) NOT NULL,
+  media_id CHAR(36) NOT NULL,
+  role VARCHAR(32) NOT NULL DEFAULT 'gallery',
+  position INT NOT NULL DEFAULT 0,
+  alt_text VARCHAR(500) NOT NULL,
+  focal_x DECIMAL(4,3) NOT NULL DEFAULT 0.5,
+  focal_y DECIMAL(4,3) NOT NULL DEFAULT 0.5,
+  PRIMARY KEY (project_id, media_id, role),
+  CONSTRAINT project_media_project_fk FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+  CONSTRAINT project_media_media_fk FOREIGN KEY (media_id) REFERENCES media(id) ON DELETE RESTRICT
 );
-
 CREATE TABLE IF NOT EXISTS navigation_items (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  location TEXT NOT NULL CHECK (location IN ('header', 'footer')),
-  label TEXT NOT NULL,
-  href TEXT NOT NULL,
-  position INTEGER NOT NULL DEFAULT 0,
+  id CHAR(36) PRIMARY KEY,
+  location VARCHAR(16) NOT NULL,
+  label VARCHAR(80) NOT NULL,
+  href VARCHAR(255) NOT NULL,
+  position INT NOT NULL DEFAULT 0,
   visible BOOLEAN NOT NULL DEFAULT TRUE,
-  status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'published', 'archived')),
-  draft JSONB NOT NULL,
-  published JSONB,
-  published_revision_id UUID,
-  published_at TIMESTAMPTZ,
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  status VARCHAR(16) NOT NULL DEFAULT 'draft',
+  draft JSON NOT NULL,
+  published JSON NULL,
+  published_revision_id CHAR(36) NULL,
+  published_at DATETIME(3) NULL,
+  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  CHECK (location IN ('header','footer')),
+  CHECK (status IN ('draft','published','archived'))
 );
 CREATE TABLE IF NOT EXISTS seo_metadata (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  route TEXT NOT NULL UNIQUE,
-  status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'published')),
-  draft JSONB NOT NULL,
-  published JSONB,
-  published_revision_id UUID,
-  published_at TIMESTAMPTZ,
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  id CHAR(36) PRIMARY KEY,
+  route VARCHAR(255) NOT NULL UNIQUE,
+  status VARCHAR(16) NOT NULL DEFAULT 'draft',
+  draft JSON NOT NULL,
+  published JSON NULL,
+  published_revision_id CHAR(36) NULL,
+  published_at DATETIME(3) NULL,
+  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  CHECK (status IN ('draft','published'))
 );
-
 CREATE TABLE IF NOT EXISTS contact_submissions (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name TEXT NOT NULL,
-  email TEXT NOT NULL,
-  company TEXT NOT NULL DEFAULT '',
-  subject TEXT NOT NULL,
+  id CHAR(36) PRIMARY KEY,
+  name VARCHAR(180) NOT NULL,
+  email VARCHAR(320) NOT NULL,
+  company VARCHAR(300) NOT NULL DEFAULT '',
+  subject VARCHAR(300) NOT NULL,
   message TEXT NOT NULL,
-  status TEXT NOT NULL DEFAULT 'new' CHECK (status IN ('new', 'reviewing', 'qualified', 'won', 'archived')),
-  delivery_status TEXT NOT NULL DEFAULT 'pending' CHECK (delivery_status IN ('pending', 'sent', 'failed', 'not_configured')),
-  delivery_error_code TEXT,
-  source TEXT NOT NULL DEFAULT 'website-contact',
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  status VARCHAR(16) NOT NULL DEFAULT 'new',
+  delivery_status VARCHAR(20) NOT NULL DEFAULT 'pending',
+  delivery_error_code VARCHAR(80) NULL,
+  source VARCHAR(80) NOT NULL DEFAULT 'website-contact',
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  CHECK (status IN ('new','reviewing','qualified','won','archived')),
+  CHECK (delivery_status IN ('pending','sent','failed','not_configured')),
+  INDEX contact_submissions_created_idx (created_at)
 );
-CREATE INDEX IF NOT EXISTS contact_submissions_created_idx ON contact_submissions(created_at DESC);
-
 CREATE TABLE IF NOT EXISTS revisions (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  entity_type TEXT NOT NULL CHECK (entity_type IN ('settings', 'page', 'section', 'project', 'navigation', 'seo')),
-  entity_id TEXT NOT NULL,
-  snapshot JSONB NOT NULL,
-  author_id UUID REFERENCES users(id) ON DELETE SET NULL,
-  publish_state TEXT NOT NULL CHECK (publish_state IN ('draft', 'published', 'restored')),
-  restores_revision_id UUID REFERENCES revisions(id) ON DELETE SET NULL,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  id CHAR(36) PRIMARY KEY,
+  entity_type VARCHAR(16) NOT NULL,
+  entity_id VARCHAR(255) NOT NULL,
+  snapshot JSON NOT NULL,
+  author_id CHAR(36) NULL,
+  publish_state VARCHAR(16) NOT NULL,
+  restores_revision_id CHAR(36) NULL,
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  CONSTRAINT revisions_author_fk FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE SET NULL,
+  CONSTRAINT revisions_restore_fk FOREIGN KEY (restores_revision_id) REFERENCES revisions(id) ON DELETE SET NULL,
+  CHECK (entity_type IN ('settings','page','section','project','navigation','seo')),
+  CHECK (publish_state IN ('draft','published','restored')),
+  INDEX revisions_entity_idx (entity_type, entity_id, created_at)
 );
-ALTER TABLE site_settings ADD CONSTRAINT site_settings_revision_fk FOREIGN KEY (published_revision_id) REFERENCES revisions(id) ON DELETE SET NULL;
-ALTER TABLE pages ADD CONSTRAINT pages_revision_fk FOREIGN KEY (published_revision_id) REFERENCES revisions(id) ON DELETE SET NULL;
-ALTER TABLE projects ADD CONSTRAINT projects_revision_fk FOREIGN KEY (published_revision_id) REFERENCES revisions(id) ON DELETE SET NULL;
-ALTER TABLE navigation_items ADD CONSTRAINT navigation_revision_fk FOREIGN KEY (published_revision_id) REFERENCES revisions(id) ON DELETE SET NULL;
-ALTER TABLE seo_metadata ADD CONSTRAINT seo_revision_fk FOREIGN KEY (published_revision_id) REFERENCES revisions(id) ON DELETE SET NULL;
-
 CREATE TABLE IF NOT EXISTS activity_logs (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  actor_id UUID REFERENCES users(id) ON DELETE SET NULL,
-  action TEXT NOT NULL,
-  entity_type TEXT,
-  entity_id TEXT,
-  safe_metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
-  correlation_id TEXT NOT NULL,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  id CHAR(36) PRIMARY KEY,
+  actor_id CHAR(36) NULL,
+  action VARCHAR(100) NOT NULL,
+  entity_type VARCHAR(40) NULL,
+  entity_id VARCHAR(255) NULL,
+  safe_metadata JSON NOT NULL,
+  correlation_id VARCHAR(100) NOT NULL,
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  CONSTRAINT activity_actor_fk FOREIGN KEY (actor_id) REFERENCES users(id) ON DELETE SET NULL,
+  INDEX activity_logs_created_idx (created_at)
 );
-CREATE INDEX IF NOT EXISTS activity_logs_created_idx ON activity_logs(created_at DESC);
-
 CREATE TABLE IF NOT EXISTS login_attempts (
-  subject_hash TEXT PRIMARY KEY,
-  attempts INTEGER NOT NULL DEFAULT 0,
-  window_started_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  locked_until TIMESTAMPTZ,
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  subject_hash CHAR(64) PRIMARY KEY,
+  attempts INT NOT NULL DEFAULT 0,
+  window_started_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  locked_until DATETIME(3) NULL,
+  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)
 );
 CREATE TABLE IF NOT EXISTS request_limits (
-  bucket_hash TEXT PRIMARY KEY,
-  hits INTEGER NOT NULL DEFAULT 0,
-  window_started_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-CREATE TABLE IF NOT EXISTS schema_migrations (
-  name TEXT PRIMARY KEY,
-  applied_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  bucket_hash CHAR(64) PRIMARY KEY,
+  hits INT NOT NULL DEFAULT 0,
+  window_started_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)
 );

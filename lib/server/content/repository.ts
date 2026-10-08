@@ -1,4 +1,5 @@
 import "server-only";
+import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { requireOwner, UnauthorizedError } from "../auth";
 import { transaction, query } from "../db";
@@ -68,9 +69,9 @@ export async function listContent(kind: ContentKind): Promise<ContentRecord[]> {
     return row ? [{ key: "default", title: "Site settings", status: row.status, draft: row.draft, published: row.published, updatedAt: row.draft_updated_at.toISOString() }] : [];
   }
   const table = kind === "pages" ? "pages" : kind === "projects" ? "projects" : kind === "navigation" ? "navigation_items" : "seo_metadata";
-  const keyColumn = kind === "pages" ? "key" : kind === "projects" ? "slug" : kind === "navigation" ? "id" : "route";
+  const keyColumn = kind === "pages" ? "`key`" : kind === "projects" ? "slug" : kind === "navigation" ? "id" : "route";
   const titleColumn = kind === "pages" ? "title" : kind === "projects" ? "slug" : kind === "navigation" ? "label" : "route";
-  const rows = (await query<{ key: string; title: string; status: string; draft: Record<string, unknown>; published: Record<string, unknown> | null; updated_at: Date }>(`SELECT ${keyColumn}::text AS key, ${titleColumn} AS title, status, draft, published, updated_at FROM ${table} ORDER BY updated_at DESC`)).rows;
+  const rows = (await query<{ key: string; title: string; status: string; draft: Record<string, unknown>; published: Record<string, unknown> | null; updated_at: Date }>(`SELECT ${keyColumn} AS key, ${titleColumn} AS title, status, draft, published, updated_at FROM ${table} ORDER BY updated_at DESC`)).rows;
   return rows.map((row) => ({ key: row.key, title: row.title, status: row.status, draft: row.draft, published: row.published, updatedAt: row.updated_at.toISOString() }));
 }
 
@@ -79,28 +80,28 @@ export async function saveDraft(kind: ContentKind, key: string, input: Record<st
   const draft = validateDraft(kind, key, input);
   await transaction(async (client) => {
     const target = kind === "settings" ? { table: "site_settings", where: "id='default'", values: [JSON.stringify(draft)] as unknown[] } :
-      kind === "pages" ? { table: "pages", where: "key=$2", values: [JSON.stringify(draft), key] } :
+      kind === "pages" ? { table: "pages", where: "`key`=$2", values: [JSON.stringify(draft), key] } :
       kind === "projects" ? { table: "projects", where: "slug=$2", values: [JSON.stringify(draft), key] } :
       kind === "navigation" ? { table: "navigation_items", where: "id=$2", values: [JSON.stringify(draft), key] } :
       { table: "seo_metadata", where: "route=$2", values: [JSON.stringify(draft), key] };
-    const sql = kind === "settings" ? "UPDATE site_settings SET draft=$1::jsonb,draft_updated_at=now(),status=CASE WHEN published IS NULL THEN 'draft' ELSE status END WHERE id='default'" :
-      `UPDATE ${target.table} SET draft=$1::jsonb,updated_at=now(),status=CASE WHEN published IS NULL THEN 'draft' ELSE status END WHERE ${target.where}`;
+    const sql = kind === "settings" ? "UPDATE site_settings SET draft=$1,draft_updated_at=now(),status=CASE WHEN published IS NULL THEN 'draft' ELSE status END WHERE id='default'" :
+      `UPDATE ${target.table} SET draft=$1,updated_at=now(),status=CASE WHEN published IS NULL THEN 'draft' ELSE status END WHERE ${target.where}`;
     const result = await client.query(sql, target.values);
     if (!result.rowCount) throw new Error("Content record was not found.");
     const entityId = kind === "settings" ? "default" : key;
     if (kind === "pages") {
       const page = draft as z.infer<typeof pageSchema>;
-      const pageId = (await client.query<{ id: string }>("SELECT id FROM pages WHERE key=$1", [key])).rows[0]?.id;
+      const pageId = (await client.query<{ id: string }>("SELECT id FROM pages WHERE `key`=$1", [key])).rows[0]?.id;
       if (!pageId) throw new Error("Page record was not found.");
       for (const section of page.sections) await client.query(
         `INSERT INTO page_sections(page_id,section_key,section_type,position,status,draft)
-         VALUES($1,$2,$3,$4,'draft',$5::jsonb)
-         ON CONFLICT(page_id,section_key) DO UPDATE SET section_type=EXCLUDED.section_type,position=EXCLUDED.position,draft=EXCLUDED.draft,status='draft'`,
+         VALUES($1,$2,$3,$4,'draft',$5)
+         ON DUPLICATE KEY UPDATE section_type=VALUES(section_type),position=VALUES(position),draft=VALUES(draft),status='draft'`,
         [pageId, section.key, section.type, section.position, JSON.stringify(section.content)],
       );
     }
-    await client.query("INSERT INTO revisions(entity_type,entity_id,snapshot,author_id,publish_state) VALUES($1,$2,$3::jsonb,$4,'draft')", [kind === "pages" ? "page" : kind === "projects" ? "project" : kind === "navigation" ? "navigation" : kind === "seo" ? "seo" : "settings", entityId, JSON.stringify(draft), actorId]);
-    await client.query("INSERT INTO activity_logs(actor_id,action,entity_type,entity_id,safe_metadata,correlation_id) VALUES($1,'content.draft_saved',$2,$3,$4::jsonb,$5)", [actorId, kind, entityId, JSON.stringify({ kind }), requestId]);
+    await client.query("INSERT INTO revisions(id,entity_type,entity_id,snapshot,author_id,publish_state) VALUES($1,$2,$3,$4,$5,'draft')", [randomUUID(), kind === "pages" ? "page" : kind === "projects" ? "project" : kind === "navigation" ? "navigation" : kind === "seo" ? "seo" : "settings", entityId, JSON.stringify(draft), actorId]);
+    await client.query("INSERT INTO activity_logs(id,actor_id,action,entity_type,entity_id,safe_metadata,correlation_id) VALUES($1,$2,'content.draft_saved',$3,$4,$5,$6)", [randomUUID(), actorId, kind, entityId, JSON.stringify({ kind }), requestId]);
   });
 }
 
@@ -111,21 +112,22 @@ export async function publishContent(kind: ContentKind, key: string, actorId: st
     if (kind === "settings") row = (await client.query<{ draft: Record<string, unknown> }>("SELECT draft FROM site_settings WHERE id='default' FOR UPDATE")).rows[0];
     else {
       const table = kind === "pages" ? "pages" : kind === "projects" ? "projects" : kind === "navigation" ? "navigation_items" : "seo_metadata";
-      const col = kind === "pages" ? "key" : kind === "projects" ? "slug" : kind === "navigation" ? "id" : "route";
-      row = (await client.query<{ id: string; draft: Record<string, unknown> }>(`SELECT id::text,draft FROM ${table} WHERE ${col}=$1 FOR UPDATE`, [key])).rows[0];
+      const col = kind === "pages" ? "`key`" : kind === "projects" ? "slug" : kind === "navigation" ? "id" : "route";
+      row = (await client.query<{ id: string; draft: Record<string, unknown> }>(`SELECT id,draft FROM ${table} WHERE ${col}=$1 FOR UPDATE`, [key])).rows[0];
     }
     if (!row) throw new Error("Content record was not found.");
     const draft = validateDraft(kind, key, row.draft);
     const entityType = kind === "pages" ? "page" : kind === "projects" ? "project" : kind === "navigation" ? "navigation" : kind === "seo" ? "seo" : "settings";
     const entityId = kind === "settings" ? "default" : key;
-    const revision = await client.query<{ id: string }>("INSERT INTO revisions(entity_type,entity_id,snapshot,author_id,publish_state) VALUES($1,$2,$3::jsonb,$4,'published') RETURNING id", [entityType, entityId, JSON.stringify(draft), actorId]);
+    const revisionId = randomUUID();
+    await client.query("INSERT INTO revisions(id,entity_type,entity_id,snapshot,author_id,publish_state) VALUES($1,$2,$3,$4,$5,'published')", [revisionId, entityType, entityId, JSON.stringify(draft), actorId]);
     const table = kind === "settings" ? "site_settings" : kind === "pages" ? "pages" : kind === "projects" ? "projects" : kind === "navigation" ? "navigation_items" : "seo_metadata";
-    const col = kind === "settings" ? "id" : kind === "pages" ? "key" : kind === "projects" ? "slug" : kind === "navigation" ? "id" : "route";
+    const col = kind === "settings" ? "id" : kind === "pages" ? "`key`" : kind === "projects" ? "slug" : kind === "navigation" ? "id" : "route";
     const where = kind === "settings" ? "id='default'" : `${col}=$2`;
-    const values = kind === "settings" ? [JSON.stringify(draft), revision.rows[0].id] : [JSON.stringify(draft), key, revision.rows[0].id];
+    const values = kind === "settings" ? [JSON.stringify(draft), revisionId] : [JSON.stringify(draft), key, revisionId];
     const bind = kind === "settings" ? "published_revision_id=$2" : "published_revision_id=$3";
-    if (kind === "settings") await client.query("UPDATE site_settings SET published=$1::jsonb,status='published',published_at=now(),published_revision_id=$2,draft_updated_at=now() WHERE id='default'", values);
-    else await client.query(`UPDATE ${table} SET published=$1::jsonb,status='published',published_at=now(),${bind},updated_at=now() WHERE ${where}`, values);
+    if (kind === "settings") await client.query("UPDATE site_settings SET published=$1,status='published',published_at=now(),published_revision_id=$2,draft_updated_at=now() WHERE id='default'", values);
+    else await client.query(`UPDATE ${table} SET published=$1,status='published',published_at=now(),${bind},updated_at=now() WHERE ${where}`, values);
     if (kind === "projects") {
       if (typeof draft.image === "string" && draft.image.startsWith("media:")) {
         const mediaId = draft.image.slice("media:".length);
@@ -133,7 +135,7 @@ export async function publishContent(kind: ContentKind, key: string, actorId: st
         const media = (await client.query<{ focal_x: number; focal_y: number }>("SELECT focal_x,focal_y FROM media WHERE id=$1 AND archived_at IS NULL AND processing_state='ready'", [mediaId])).rows[0];
         if (!project || !media) throw new Error("Select an available, validated image before publishing this project.");
         await client.query("DELETE FROM project_media WHERE project_id=$1 AND role='hero'", [project.id]);
-        await client.query("INSERT INTO project_media(project_id,media_id,role,position,alt_text,focal_x,focal_y) VALUES($1,$2,'hero',0,$3,$4,$5) ON CONFLICT(project_id,media_id,role) DO UPDATE SET alt_text=EXCLUDED.alt_text,focal_x=EXCLUDED.focal_x,focal_y=EXCLUDED.focal_y", [project.id,mediaId,draft.imageAlt,media.focal_x,media.focal_y]);
+        await client.query("INSERT INTO project_media(project_id,media_id,role,position,alt_text,focal_x,focal_y) VALUES($1,$2,'hero',0,$3,$4,$5) ON DUPLICATE KEY UPDATE alt_text=VALUES(alt_text),focal_x=VALUES(focal_x),focal_y=VALUES(focal_y)", [project.id,mediaId,draft.imageAlt,media.focal_x,media.focal_y]);
       } else {
         const projectId = (await client.query<{ id: string }>("SELECT id FROM projects WHERE slug=$1", [key])).rows[0]?.id;
         if (projectId) await client.query("DELETE FROM project_media WHERE project_id=$1 AND role='hero'", [projectId]);
@@ -148,13 +150,15 @@ export async function publishContent(kind: ContentKind, key: string, actorId: st
       const page = draft as z.infer<typeof pageSchema>;
       for (const section of page.sections) await client.query(
         `INSERT INTO page_sections(page_id,section_key,section_type,position,status,draft,published)
-         VALUES($1,$2,$3,$4,'published',$5::jsonb,$5::jsonb)
-         ON CONFLICT(page_id,section_key) DO UPDATE SET section_type=EXCLUDED.section_type,position=EXCLUDED.position,draft=EXCLUDED.draft,published=EXCLUDED.published,status='published'`,
+         VALUES($1,$2,$3,$4,'published',$5,$5)
+         ON DUPLICATE KEY UPDATE section_type=VALUES(section_type),position=VALUES(position),draft=VALUES(draft),published=VALUES(published),status='published'`,
         [pageId, section.key, section.type, section.position, JSON.stringify(section.content)],
       );
-      await client.query("UPDATE page_sections SET status='archived' WHERE page_id=$1 AND NOT (section_key=ANY($2::text[]))", [pageId, page.sections.map((section) => section.key)]);
+      const sectionKeys = page.sections.map((section) => section.key);
+      const placeholders = sectionKeys.map((_, index) => `$${index + 2}`).join(",");
+      await client.query(`UPDATE page_sections SET status='archived' WHERE page_id=$1${placeholders ? ` AND section_key NOT IN (${placeholders})` : ""}`, [pageId, ...sectionKeys]);
     }
-    await client.query("INSERT INTO activity_logs(actor_id,action,entity_type,entity_id,safe_metadata,correlation_id) VALUES($1,'content.published',$2,$3,'{}'::jsonb,$4)", [actorId, entityType, entityId, requestId]);
+    await client.query("INSERT INTO activity_logs(id,actor_id,action,entity_type,entity_id,safe_metadata,correlation_id) VALUES($1,$2,'content.published',$3,$4,'{}',$5)", [randomUUID(), actorId, entityType, entityId, requestId]);
   });
 }
 
@@ -168,26 +172,26 @@ export async function restoreRevision(revisionId: string, actorId: string, reque
     if (!target) throw new Error("This revision type cannot be restored.");
     const key = revision.entity_type === "settings" ? "default" : revision.entity_id;
     const timestampColumn = revision.entity_type === "settings" ? "draft_updated_at" : "updated_at";
-    const current = await client.query(`UPDATE ${target.table} SET draft=$1::jsonb,${timestampColumn}=now() WHERE ${target.column}::text=$2`, [JSON.stringify(revision.snapshot), key]);
+    const current = await client.query(`UPDATE ${target.table} SET draft=$1,${timestampColumn}=now() WHERE ${target.column}=$2`, [JSON.stringify(revision.snapshot), key]);
     if (!current.rowCount) throw new Error("The source content record no longer exists.");
     if (revision.entity_type === "page") {
       const page = revision.snapshot as z.infer<typeof pageSchema>;
-      const pageId = (await client.query<{ id: string }>("SELECT id FROM pages WHERE key=$1", [key])).rows[0]?.id;
+      const pageId = (await client.query<{ id: string }>("SELECT id FROM pages WHERE `key`=$1", [key])).rows[0]?.id;
       if (pageId) for (const section of page.sections) await client.query(
         `INSERT INTO page_sections(page_id,section_key,section_type,position,status,draft)
-         VALUES($1,$2,$3,$4,'draft',$5::jsonb)
-         ON CONFLICT(page_id,section_key) DO UPDATE SET section_type=EXCLUDED.section_type,position=EXCLUDED.position,draft=EXCLUDED.draft,status='draft'`,
+         VALUES($1,$2,$3,$4,'draft',$5)
+         ON DUPLICATE KEY UPDATE section_type=VALUES(section_type),position=VALUES(position),draft=VALUES(draft),status='draft'`,
         [pageId, section.key, section.type, section.position, JSON.stringify(section.content)],
       );
     }
-    await client.query("INSERT INTO revisions(entity_type,entity_id,snapshot,author_id,publish_state,restores_revision_id) VALUES($1,$2,$3::jsonb,$4,'restored',$5)", [revision.entity_type, revision.entity_id, JSON.stringify(revision.snapshot), actorId, revisionId]);
-    await client.query("INSERT INTO activity_logs(actor_id,action,entity_type,entity_id,safe_metadata,correlation_id) VALUES($1,'content.restored_as_draft',$2,$3,$4::jsonb,$5)", [actorId, revision.entity_type, revision.entity_id, JSON.stringify({ revisionId }), requestId]);
+    await client.query("INSERT INTO revisions(id,entity_type,entity_id,snapshot,author_id,publish_state,restores_revision_id) VALUES($1,$2,$3,$4,$5,'restored',$6)", [randomUUID(), revision.entity_type, revision.entity_id, JSON.stringify(revision.snapshot), actorId, revisionId]);
+    await client.query("INSERT INTO activity_logs(id,actor_id,action,entity_type,entity_id,safe_metadata,correlation_id) VALUES($1,$2,'content.restored_as_draft',$3,$4,$5,$6)", [randomUUID(), actorId, revision.entity_type, revision.entity_id, JSON.stringify({ revisionId }), requestId]);
   });
 }
 
 export async function getDraft(kind: ContentKind, key: string): Promise<Record<string, unknown> | null> {
   const table = kind === "settings" ? "site_settings" : kind === "pages" ? "pages" : kind === "projects" ? "projects" : kind === "navigation" ? "navigation_items" : "seo_metadata";
-  const col = kind === "settings" ? "id" : kind === "pages" ? "key" : kind === "projects" ? "slug" : kind === "navigation" ? "id" : "route";
+  const col = kind === "settings" ? "id" : kind === "pages" ? "`key`" : kind === "projects" ? "slug" : kind === "navigation" ? "id" : "route";
   const row = (await query<{ draft: Record<string, unknown> }>(`SELECT draft FROM ${table} WHERE ${col}=$1`, [kind === "settings" ? "default" : key])).rows[0];
   return row?.draft ?? null;
 }

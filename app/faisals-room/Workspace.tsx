@@ -51,9 +51,9 @@ async function Overview() {
   let counts: { publishedPages: number | null; drafts: number | null; leads: number | null } = { publishedPages: 0, drafts: 0, leads: 0 };
   try {
     const [pages, drafts, leads] = await Promise.all([
-      query<{ count: string }>("SELECT count(*)::text AS count FROM pages WHERE status='published'"),
+      query<{ count: string }>("SELECT count(*) AS count FROM pages WHERE status='published'"),
       query<{ count: string }>("SELECT (SELECT count(*) FROM pages WHERE status='draft') + (SELECT count(*) FROM projects WHERE status='draft') + (SELECT count(*) FROM navigation_items WHERE status='draft') AS count"),
-      query<{ count: string }>("SELECT count(*)::text AS count FROM contact_submissions WHERE status <> 'archived'"),
+      query<{ count: string }>("SELECT count(*) AS count FROM contact_submissions WHERE status <> 'archived'"),
     ]);
     counts = { publishedPages: Number(pages.rows[0]?.count ?? 0), drafts: Number(drafts.rows[0]?.count ?? 0), leads: Number(leads.rows[0]?.count ?? 0) };
   } catch { counts = { publishedPages: null, drafts: null, leads: null }; }
@@ -71,7 +71,7 @@ async function SystemReadiness() {
     const config = getConfig();
     if (config.DATABASE_URL) {
       database = "Configured";
-      const result = await query<{ count: string }>("SELECT count(*)::text AS count FROM schema_migrations");
+      const result = await query<{ count: string }>("SELECT count(*) AS count FROM schema_migrations");
       migration = `${result.rows[0]?.count ?? "0"} migration(s) applied`;
     }
   } catch { database = "Connection unavailable"; }

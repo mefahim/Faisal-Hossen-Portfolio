@@ -13,9 +13,9 @@
 - [x] Add private image upload validation, checksums/dimensions, WebP derivatives, alt/focal metadata, usage references, safe archive rules, and filesystem storage outside the public web root.
 - [x] Store contacts durably before optional Resend notification and expose honest storage/delivery states without adding an unverified email address.
 - [x] Build the responsive dark-sidebar/light-workspace product UI with accessible forms, empty/error states, and no decorative analytics.
-- [ ] Complete migration/seed parity and authenticated workflow tests against the production-equivalent PostgreSQL/storage configuration; finish deployment browser/accessibility review at approved viewports.
+- [ ] Complete migration/seed parity and authenticated workflow tests against the production-equivalent MySQL 8+/storage configuration; finish deployment browser/accessibility review at approved viewports.
 
-> Audit note (2026-10-08): local typecheck, 6/6 unit tests, standalone production build, public route smoke checks, anonymous private-route redirect, same-origin/cross-origin mutation guards, and public robots/sitemap exclusion checks passed. The acceptance checkbox remains open because no PostgreSQL, production origin/secret, owner bootstrap input, durable storage confirmation, deployed host, or browser automation was available.
+> Audit note (2026-10-08): local typecheck, 6/6 unit tests, standalone production build, public route smoke checks, anonymous private-route redirect, same-origin/cross-origin mutation guards, and public robots/sitemap exclusion checks passed. The acceptance checkbox remains open because no MySQL 8+, production origin/secret, owner bootstrap input, durable storage confirmation, deployed host, or browser automation was available.
 
 ## Phase 2 — Intelligence: SEO, Analytics, Leads, Health, and redirects
 

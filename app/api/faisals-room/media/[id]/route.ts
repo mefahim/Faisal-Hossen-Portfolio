@@ -34,7 +34,7 @@ export async function PATCH(request: Request, { params }: Params) {
     if (![x,y].every((value) => Number.isFinite(value) && value >= 0 && value <= 1)) return NextResponse.json({ error: "Focal point must be between 0 and 1." }, { status: 400 });
     const result = await query("UPDATE media SET alt_text=$1,focal_x=$2,focal_y=$3 WHERE id=$4 AND archived_at IS NULL", [body.altText.trim(), x, y, id]);
     if (!result.rowCount) return NextResponse.json({ error: "Image was not found." }, { status: 404 });
-    await query("INSERT INTO activity_logs(actor_id,action,entity_type,entity_id,safe_metadata,correlation_id) VALUES($1,'media.metadata_updated','media',$2,'{}'::jsonb,$3)", [owner.userId,id,randomUUID()]);
+    await query("INSERT INTO activity_logs(id,actor_id,action,entity_type,entity_id,safe_metadata,correlation_id) VALUES($1,$2,'media.metadata_updated','media',$3,'{}',$4)", [randomUUID(), owner.userId,id,randomUUID()]);
     return NextResponse.json({ message: "Image metadata updated." }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) {
     if (error instanceof RequestBodyError) return NextResponse.json({ error: error.message }, { status: error.status });
@@ -47,12 +47,12 @@ export async function DELETE(request: Request, { params }: Params) {
   if (!sameOrigin(request)) return NextResponse.json({ error: "Request origin could not be verified." }, { status: 403 });
   try {
     const owner = await requireOwner();
-    const usage = await query<{ count: number; storage_key: string; derivatives: Record<string, string> }>("SELECT ((SELECT count(*) FROM project_media pm WHERE pm.media_id=m.id)+(SELECT count(*) FROM projects p WHERE p.draft->>'image'=$2 OR p.published->>'image'=$2))::int AS count,m.storage_key,m.derivatives FROM media m WHERE m.id=$1", [id,`media:${id}`]);
+    const usage = await query<{ count: number; storage_key: string; derivatives: Record<string, string> }>("SELECT ((SELECT count(*) FROM project_media pm WHERE pm.media_id=m.id)+(SELECT count(*) FROM projects p WHERE JSON_UNQUOTE(JSON_EXTRACT(p.draft,'$.image'))=$2 OR JSON_UNQUOTE(JSON_EXTRACT(p.published,'$.image'))=$2)) AS count,m.storage_key,m.derivatives FROM media m WHERE m.id=$1", [id,`media:${id}`]);
     const row = usage.rows[0];
     if (!row) return NextResponse.json({ error: "Image was not found." }, { status: 404 });
     if (row.count > 0) return NextResponse.json({ error: "This image is still in use. Remove its project references before archiving it." }, { status: 409 });
     await query("UPDATE media SET archived_at=now() WHERE id=$1 AND archived_at IS NULL", [id]);
-    await query("INSERT INTO activity_logs(actor_id,action,entity_type,entity_id,safe_metadata,correlation_id) VALUES($1,'media.archived','media',$2,'{}'::jsonb,$3)", [owner.userId,id,crypto.randomUUID()]);
+    await query("INSERT INTO activity_logs(id,actor_id,action,entity_type,entity_id,safe_metadata,correlation_id) VALUES($1,$2,'media.archived','media',$3,'{}',$4)", [randomUUID(), owner.userId,id,randomUUID()]);
     return NextResponse.json({ message: "Image archived. Stored files were retained for recovery." }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) {
     if (error instanceof UnauthorizedError) return NextResponse.json({ error: "Authentication required." }, { status: 401 });

@@ -3,7 +3,7 @@ import { z } from "zod";
 
 const optionalUrl = z.string().url().optional();
 const schema = z.object({
-  DATABASE_URL: z.string().regex(/^postgres(?:ql)?:\/\//).optional(),
+  DATABASE_URL: z.string().regex(/^mysql(?:2)?:\/\//).optional(),
   DATABASE_SSL: z.enum(["true", "false"]).default("false"),
   MEDIA_STORAGE_DIR: z.string().min(1).default("./var/media"),
   CONTENT_SOURCE: z.enum(["files", "database"]).default("files"),

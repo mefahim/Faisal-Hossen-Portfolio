@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import sharp from "sharp";
 import { NextResponse } from "next/server";
 import { requireOwner, UnauthorizedError } from "@/lib/server/auth";
@@ -19,8 +19,8 @@ export async function GET() {
     const result = await query(
       `SELECT m.id,m.storage_key,m.mime_type,m.byte_size,m.width,m.height,m.checksum_sha256,m.alt_text,m.focal_x,m.focal_y,m.derivatives,m.processing_state,m.archived_at,m.created_at,
         ((SELECT count(*) FROM project_media pm WHERE pm.media_id=m.id) +
-         (SELECT count(*) FROM projects p WHERE p.draft->>'image'='media:'||m.id::text OR p.published->>'image'='media:'||m.id::text))::int AS usage_count
-       FROM media m ORDER BY m.archived_at NULLS FIRST,m.created_at DESC LIMIT 500`,
+         (SELECT count(*) FROM projects p WHERE JSON_UNQUOTE(JSON_EXTRACT(p.draft,'$.image'))=CONCAT('media:',m.id) OR JSON_UNQUOTE(JSON_EXTRACT(p.published,'$.image'))=CONCAT('media:',m.id))) AS usage_count
+       FROM media m ORDER BY (m.archived_at IS NOT NULL),m.created_at DESC LIMIT 500`,
     );
     return NextResponse.json({ media: result.rows }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) {
@@ -48,20 +48,20 @@ export async function POST(request: Request) {
     if (!info.format || !mimeByFormat[info.format] || !info.width || !info.height || info.width * info.height > MAX_PIXELS) return NextResponse.json({ error: "Only valid JPEG, PNG, WebP, and AVIF images are accepted." }, { status: 415 });
     const main = await sharp(input, { failOn: "error", limitInputPixels: MAX_PIXELS }).rotate().resize({ width: 2000, height: 2000, fit: "inside", withoutEnlargement: true }).webp({ quality: 88, effort: 4 }).toBuffer();
     const thumbnail = await sharp(input, { failOn: "error", limitInputPixels: MAX_PIXELS }).rotate().resize({ width: 480, height: 360, fit: "inside", withoutEnlargement: true }).webp({ quality: 80, effort: 4 }).toBuffer();
-    const id = crypto.randomUUID();
+    const id = randomUUID();
     const originalKey = await createMediaKey(extensionByFormat[info.format]);
     const derivativeKeys = { preview: `derivatives/${id}-preview.webp`, thumbnail: `derivatives/${id}-thumbnail.webp` };
     keys = [originalKey, derivativeKeys.preview, derivativeKeys.thumbnail];
     await Promise.all([writePrivateMedia(originalKey, input), writePrivateMedia(derivativeKeys.preview, main), writePrivateMedia(derivativeKeys.thumbnail, thumbnail)]);
     const checksum = createHash("sha256").update(input).digest("hex");
     const mediaRow = await transaction(async (client) => {
-      const inserted = await client.query<{ id: string }>(
+      await client.query(
         `INSERT INTO media(id,storage_key,mime_type,byte_size,width,height,checksum_sha256,alt_text,focal_x,focal_y,derivatives,processing_state)
-         VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,'ready') RETURNING id`,
+         VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'ready')`,
         [id, originalKey, mimeByFormat[info.format], input.length, info.width, info.height, checksum, metadata.data.altText, metadata.data.focalX, metadata.data.focalY, JSON.stringify({ preview: derivativeKeys.preview, thumbnail: derivativeKeys.thumbnail, outputMime: "image/webp" })],
       );
-      await client.query("INSERT INTO activity_logs(actor_id,action,entity_type,entity_id,safe_metadata,correlation_id) VALUES($1,'media.uploaded','media',$2,$3::jsonb,$4)", [owner.userId, id, JSON.stringify({ mime: mimeByFormat[info.format], bytes: input.length }), requestId]);
-      return inserted.rows[0];
+      await client.query("INSERT INTO activity_logs(id,actor_id,action,entity_type,entity_id,safe_metadata,correlation_id) VALUES($1,$2,'media.uploaded','media',$3,$4,$5)", [randomUUID(), owner.userId, id, JSON.stringify({ mime: mimeByFormat[info.format], bytes: input.length }), requestId]);
+      return { id };
     });
     return NextResponse.json({ id: mediaRow.id, message: "Image uploaded, validated, and stored privately." }, { status: 201, headers: { "Cache-Control": "private, no-store" } });
   } catch (error) {

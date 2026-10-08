@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { transaction } from "@/lib/server/db";
 import { consumeRateLimit } from "@/lib/server/rate-limit";
@@ -16,12 +17,9 @@ export async function POST(request: Request) {
     if (!limit.allowed) return NextResponse.json({ error: "Too many messages were submitted. Please try again later." }, { status: 429, headers: { "Retry-After": String(limit.retrySeconds) } });
 
     const lead = await transaction(async (client) => {
-      const result = await client.query<{ id: string }>(
-        "INSERT INTO contact_submissions(name,email,company,subject,message,delivery_status) VALUES($1,$2,$3,$4,$5,'pending') RETURNING id",
-        [input.data.name, input.data.email, input.data.company, input.data.subject, input.data.message],
-      );
-      const id = result.rows[0].id;
-      await client.query("INSERT INTO activity_logs(actor_id,action,entity_type,entity_id,safe_metadata,correlation_id) VALUES(NULL,'contact.stored','lead',$1,'{}'::jsonb,$2)", [id, requestId]);
+      const id = randomUUID();
+      await client.query("INSERT INTO contact_submissions(id,name,email,company,subject,message,delivery_status) VALUES($1,$2,$3,$4,$5,$6,'pending')", [id, input.data.name, input.data.email, input.data.company, input.data.subject, input.data.message]);
+      await client.query("INSERT INTO activity_logs(id,actor_id,action,entity_type,entity_id,safe_metadata,correlation_id) VALUES($1,NULL,'contact.stored','lead',$2,'{}',$3)", [randomUUID(), id, requestId]);
       return id;
     });
 
@@ -49,7 +47,7 @@ export async function POST(request: Request) {
     try {
       await transaction(async (client) => {
         await client.query("UPDATE contact_submissions SET delivery_status=$1,delivery_error_code=$2,updated_at=now() WHERE id=$3", [deliveryStatus, deliveryErrorCode, lead]);
-        await client.query("INSERT INTO activity_logs(actor_id,action,entity_type,entity_id,safe_metadata,correlation_id) VALUES(NULL,'contact.delivery_updated','lead',$1,$2::jsonb,$3)", [lead, JSON.stringify({ status: deliveryStatus }), requestId]);
+        await client.query("INSERT INTO activity_logs(id,actor_id,action,entity_type,entity_id,safe_metadata,correlation_id) VALUES($1,NULL,'contact.delivery_updated','lead',$2,$3,$4)", [randomUUID(), lead, JSON.stringify({ status: deliveryStatus }), requestId]);
       });
     } catch {
       console.error(`[${requestId}] Lead was durably stored; optional delivery status could not be updated.`);

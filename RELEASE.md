@@ -10,6 +10,8 @@
 
 This release contains **Phase 1 only**: private access, content drafts/publishing, media metadata/upload, durable leads, revisions, activity history, and migration-safe public reads. GA4/Search Console data, audit scoring, redirects, advanced leads, scheduled jobs, backups, monitoring, and future modules are **not implemented**. Do not start Phase 2 or Phase 3 without separate approval.
 
+For the MySQL conversion, operator execution order, exact acceptance checklist, and Phase 2 prerequisite gate, use [`MYSQL-PHASE-1-HANDOFF.md`](./MYSQL-PHASE-1-HANDOFF.md).
+
 ## Hosting and runtime
 
 The project retains `output: "standalone"`. Run the generated `.next/standalone/server.js` entrypoint through `pnpm start` (not `next start`); it listens on the host-provided `PORT`. Copy `public/` and `.next/static/` into the standalone tree after each build as shown below. Keep private media in durable storage outside `public/` and outside any release directory that is replaced during deploy. This release uses the configured server filesystem path; it is not an object-storage integration. If the hosting account cannot provide a durable private path, provision an appropriate storage adapter before accepting uploads in production.
@@ -36,7 +38,7 @@ Set these in the hosting provider’s protected environment/secrets manager:
 | Variable | Required | Purpose |
 | --- | --- | --- |
 | `NEXT_PUBLIC_SITE_URL` | Yes for production SEO | Verified public origin used for canonical, sitemap, and social metadata. |
-| `DATABASE_URL` | Yes for Faisal’s Room and contact storage | PostgreSQL connection string with a database dedicated to this application. |
+| `DATABASE_URL` | Yes for Faisal’s Room and contact storage | MySQL 8+ connection string with a database dedicated to this application. |
 | `APP_SECURITY_SECRET` | Yes for authenticated/rate-limited use | Cryptographically random secret with at least 32 characters; do not reuse a password. |
 | `MEDIA_STORAGE_DIR` | Yes before uploads | Absolute durable server path outside `public/`, surviving releases. Restrict filesystem permissions to the app process. |
 | `CONTENT_SOURCE` | Start as `files` | Change to `database` only after seed parity and content review. |
@@ -47,7 +49,7 @@ Never put a real secret into Git, a client-side `NEXT_PUBLIC_*` variable, or a c
 
 ## One-time database and owner setup
 
-1. Provision PostgreSQL and durable private media storage. Back up the database before any future content-source switch.
+1. Provision MySQL 8+ and durable private media storage. Back up the database before any future content-source switch.
 2. Set `DATABASE_URL`, `DATABASE_SSL` if needed, `APP_SECURITY_SECRET`, `MEDIA_STORAGE_DIR`, and the production origin. Keep `CONTENT_SOURCE=files`.
 3. Install dependencies and run the idempotent migration and seed commands:
 
@@ -84,5 +86,5 @@ The contact route validates origin, input and honeypot, applies a database-backe
 
 ## Phase 1 verification status at implementation handoff
 
-TypeScript, the schema unit suite, and a production build are run in the implementation workspace. Database migration/seed parity, authenticated browser flows, durable media persistence, and the production-origin visual/accessibility review must still be completed against the operator-provided PostgreSQL, filesystem, domain, and owner credentials. See [`FAISALS-ROOM-PHASE-1-REPORT.md`](./FAISALS-ROOM-PHASE-1-REPORT.md) and [`FAISALS-ROOM-TODO.md`](./FAISALS-ROOM-TODO.md).
-On 2026-10-08, a clean checkout also passed frozen dependency installation, `pnpm typecheck`, `pnpm test` (6/6), standalone `pnpm build`, public route smoke checks, private-route redirect, same-origin/cross-origin mutation guards, and robots/sitemap exclusion checks. Database migration/seed parity, authenticated browser flows, durable media persistence, contact persistence, and the production-origin visual/accessibility review still must be completed against the operator-provided PostgreSQL, filesystem, domain, owner credentials, and deployed host. See [`FAISALS-ROOM-PHASE-1-REPORT.md`](./FAISALS-ROOM-PHASE-1-REPORT.md) and [`FAISALS-ROOM-TODO.md`](./FAISALS-ROOM-TODO.md). Do not mark Phase 1 accepted from these local checks alone.
+TypeScript, the schema unit suite, and a production build are run in the implementation workspace. Database migration/seed parity, authenticated browser flows, durable media persistence, and the production-origin visual/accessibility review must still be completed against the operator-provided MySQL 8+, filesystem, domain, and owner credentials. See [`FAISALS-ROOM-PHASE-1-REPORT.md`](./FAISALS-ROOM-PHASE-1-REPORT.md) and [`FAISALS-ROOM-TODO.md`](./FAISALS-ROOM-TODO.md).
+On 2026-10-08, a clean checkout also passed frozen dependency installation, `pnpm typecheck`, `pnpm test` (6/6), standalone `pnpm build`, public route smoke checks, private-route redirect, same-origin/cross-origin mutation guards, and robots/sitemap exclusion checks. Database migration/seed parity, authenticated browser flows, durable media persistence, contact persistence, and the production-origin visual/accessibility review still must be completed against the operator-provided MySQL 8+, filesystem, domain, owner credentials, and deployed host. See [`FAISALS-ROOM-PHASE-1-REPORT.md`](./FAISALS-ROOM-PHASE-1-REPORT.md) and [`FAISALS-ROOM-TODO.md`](./FAISALS-ROOM-TODO.md). Do not mark Phase 1 accepted from these local checks alone.

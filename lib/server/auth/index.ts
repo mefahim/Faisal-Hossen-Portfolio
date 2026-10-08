@@ -1,6 +1,6 @@
 import "server-only";
 import argon2 from "argon2";
-import { randomBytes } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { cookies } from "next/headers";
 import { query, transaction } from "../db";
 import { clientAddress, digest, privateKey } from "../security";
@@ -61,8 +61,8 @@ export async function startOwnerSession(userId: string, userAgent: string | null
   const token = randomBytes(32).toString("base64url");
   const uaHash = userAgent ? digest(userAgent.slice(0, 300)) : null;
   await query(
-    "INSERT INTO sessions(user_id, token_hash, expires_at, user_agent_hash) VALUES($1,$2,now() + ($3::int * interval '1 second'),$4)",
-    [userId, digest(token), SESSION_TTL_SECONDS, uaHash],
+    `INSERT INTO sessions(id,user_id,token_hash,expires_at,user_agent_hash) VALUES($1,$2,$3,DATE_ADD(NOW(), INTERVAL ${SESSION_TTL_SECONDS} SECOND),$4)`,
+    [randomUUID(), userId, digest(token), uaHash],
   );
   await setSessionCookie(token);
 }
@@ -85,11 +85,11 @@ export async function recordLoginFailure(email: string, request: Request) {
   await query(
     `INSERT INTO login_attempts(subject_hash, attempts, window_started_at, locked_until, updated_at)
      VALUES($1,1,now(),NULL,now())
-     ON CONFLICT(subject_hash) DO UPDATE SET
-       attempts=CASE WHEN login_attempts.window_started_at < now()-interval '15 minutes' THEN 1 ELSE login_attempts.attempts+1 END,
-       window_started_at=CASE WHEN login_attempts.window_started_at < now()-interval '15 minutes' THEN now() ELSE login_attempts.window_started_at END,
-       locked_until=CASE WHEN (CASE WHEN login_attempts.window_started_at < now()-interval '15 minutes' THEN 1 ELSE login_attempts.attempts+1 END) >= 5 THEN now()+interval '15 minutes' ELSE NULL END,
-       updated_at=now()`,
+     ON DUPLICATE KEY UPDATE
+       attempts=IF(window_started_at < DATE_SUB(NOW(), INTERVAL 15 MINUTE), 1, attempts+1),
+       window_started_at=IF(window_started_at < DATE_SUB(NOW(), INTERVAL 15 MINUTE), NOW(), window_started_at),
+       locked_until=IF(IF(window_started_at < DATE_SUB(NOW(), INTERVAL 15 MINUTE), 1, attempts+1) >= 5, DATE_ADD(NOW(), INTERVAL 15 MINUTE), NULL),
+       updated_at=NOW()`,
     [key],
   );
 }
@@ -105,7 +105,7 @@ export async function changeOwnerPassword(session: OwnerSession, currentPassword
   await transaction(async (client) => {
     await client.query("UPDATE users SET password_hash=$1, password_changed_at=now(), updated_at=now() WHERE id=$2", [nextHash, session.userId]);
     await client.query("UPDATE sessions SET revoked_at=now() WHERE user_id=$1 AND revoked_at IS NULL", [session.userId]);
-    await client.query("INSERT INTO activity_logs(actor_id,action,entity_type,entity_id,safe_metadata,correlation_id) VALUES($1,'auth.password_changed','user',$1,'{}'::jsonb,$2)", [session.userId, requestId]);
+    await client.query("INSERT INTO activity_logs(id,actor_id,action,entity_type,entity_id,safe_metadata,correlation_id) VALUES($1,$2,'auth.password_changed','user',$2,'{}',$3)", [randomUUID(), session.userId, requestId]);
   });
   await startOwnerSession(session.userId, null);
 }

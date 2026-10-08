@@ -15,7 +15,7 @@ export async function POST(request: Request) {
     const body = publishSchema.safeParse(await readJsonBody(request, 8_000));
     if (!body.success) return NextResponse.json({ error: "Select a valid content record to publish." }, { status: 400 });
     await publishContent(body.data.kind, body.data.key, owner.userId, requestId);
-    const pageRoute = body.data.kind === "pages" ? (await query<{ route: string }>("SELECT route FROM pages WHERE key=$1", [body.data.key])).rows[0]?.route : undefined;
+    const pageRoute = body.data.kind === "pages" ? (await query<{ route: string }>("SELECT route FROM pages WHERE `key`=$1", [body.data.key])).rows[0]?.route : undefined;
     const paths = body.data.kind === "settings" ? ["/", "/work", "/about", "/contact"] : body.data.kind === "projects" ? ["/", "/work", `/work/${body.data.key}`] : body.data.kind === "pages" ? [pageRoute ?? "/"] : body.data.kind === "seo" ? [body.data.key] : ["/", "/work", "/about", "/contact"];
     for (const path of paths) if (typeof path === "string" && path.startsWith("/")) revalidatePath(path);
     revalidatePath("/sitemap.xml");

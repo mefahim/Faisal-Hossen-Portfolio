@@ -9,9 +9,9 @@
 
 ## Executive summary
 
-Faisal’s Room has been implemented as an incremental, single-owner foundation inside the existing Next.js portfolio. It adds the private workspace, PostgreSQL schema/migrations/seeding, Argon2id authentication and session management, server-side content/media/lead APIs, draft/preview/publish/revision workflows, private image processing, and a migration-safe public read adapter. The public portfolio remains the primary site and continues to use its checked-in verified content by default (`CONTENT_SOURCE=files`). No public database content is made live merely by running the seed.
+Faisal’s Room has been implemented as an incremental, single-owner foundation inside the existing Next.js portfolio. It adds the private workspace, MySQL 8+ schema/migrations/seeding, Argon2id authentication and session management, server-side content/media/lead APIs, draft/preview/publish/revision workflows, private image processing, and a migration-safe public read adapter. The public portfolio remains the primary site and continues to use its checked-in verified content by default (`CONTENT_SOURCE=files`). No public database content is made live merely by running the seed.
 
-The code-level checks passed. The work is **not yet accepted as production-ready** because no operator-provided PostgreSQL, durable production media path, owner bootstrap credentials, or verified production-origin review was available in this implementation session. Those remaining steps are recorded below and in `FAISALS-ROOM-TODO.md` / `RELEASE.md`.
+The code-level checks passed. The work is **not yet accepted as production-ready** because no operator-provided MySQL 8+, durable production media path, owner bootstrap credentials, or verified production-origin review was available in this implementation session. Those remaining steps are recorded below and in `FAISALS-ROOM-TODO.md` / `RELEASE.md`.
 
 ## What changed
 
@@ -70,7 +70,7 @@ The existing Home, Work, project-detail, About, Contact, header, footer, metadat
 | Standalone local route smoke test | Pass | `/`, `/work`, `/about`, `/contact`, `/faisals-room/login`, `/robots.txt`, `/sitemap.xml` returned 200. `/faisals-room` redirected to `/faisals-room/login`. |
 | Same-origin / cross-origin guard smoke test | Pass | A same-origin private content mutation reached authentication and returned 401 without a database/owner session; a cross-origin mutation returned 403. No content mutation succeeded. |
 | Contact persistence / email send | Not run | No real lead was submitted; persistent database and verified notification configuration were not available. |
-| PostgreSQL migration/seed parity and authenticated end-to-end workflow | Not run | Requires a configured database. Do not mark these acceptance gates complete based only on compilation. |
+| MySQL 8+ migration/seed parity and authenticated end-to-end workflow | Not run | Requires a configured database. Do not mark these acceptance gates complete based only on compilation. |
 | Production browser, storage durability, accessibility and viewport review | Not run | Requires the deployed environment and a manual review at the approved widths. |
 
 No production database, credentials, customer data, or live contact recipient was used. The actual standalone server startup path was exercised; build output requires the documented copy of `public/` and `.next/static/` into the standalone deployment tree.
@@ -79,7 +79,7 @@ No production database, credentials, customer data, or live contact recipient wa
 
 Provide/configure these directly in the hosting provider’s protected environment settings. **Do not send passwords or secrets in GitHub issues or chat.**
 
-1. **PostgreSQL:** a production-equivalent PostgreSQL database and `DATABASE_URL`; confirm whether `DATABASE_SSL=true` is required. No production DB URL was available during implementation.
+1. **MySQL 8+:** a production-equivalent MySQL 8+ database and `DATABASE_URL`; confirm whether `DATABASE_SSL=true` is required. No production DB URL was available during implementation.
 2. **Canonical domain:** the actual verified `NEXT_PUBLIC_SITE_URL` for production metadata and same-origin protection.
 3. **Application secret:** a cryptographically random `APP_SECURITY_SECRET` of at least 32 characters; do not reuse a login password.
 4. **Persistent media storage decision:** a durable, private `MEDIA_STORAGE_DIR` outside `public/` and outside replaced release directories, with filesystem access restricted to the app process. Confirm this is supported by the current Hostinger plan. If the Notion-approved architecture requires object storage, provision the provider/bucket credentials and implement the adapter before production media uploads.
@@ -95,7 +95,7 @@ Do these **in order**. Do not begin Phase 2 or Phase 3.
 ### A. Prepare the deployment environment
 
 1. Read `plan.md`, `FAISALS-ROOM-TODO.md`, and `RELEASE.md` first; confirm the checkout is on `main` at the pushed handoff commit.
-2. Provision PostgreSQL and the agreed persistent media storage; set the required values listed above in the hosting environment. Keep `CONTENT_SOURCE=files`.
+2. Provision MySQL 8+ and the agreed persistent media storage; set the required values listed above in the hosting environment. Keep `CONTENT_SOURCE=files`.
 3. Build the standalone release on the host or CI and copy public/static assets as documented in `RELEASE.md`. Confirm the app is running on the host-provided `PORT` and the Node.js version is 22+.
 
 ### B. Migrate and bootstrap
@@ -143,4 +143,4 @@ The current `main` branch was audited from a clean checkout at handoff revision 
 - Security smoke test — passed: cross-origin content mutation returned 403 and same-origin unauthenticated content mutation returned 401.
 - Public crawl check — passed: robots excludes `/api/` and `/faisals-room`; sitemap contained no private/API route.
 
-The required acceptance environment was not available in this session: no `DATABASE_URL`/PostgreSQL service, verified production `NEXT_PUBLIC_SITE_URL`, operator-provided owner bootstrap input, deployment-host access, or provider-confirmed durable `MEDIA_STORAGE_DIR` was present. Playwright/browser automation was also not installed. Therefore migration/seed parity, authenticated workflows, contact persistence, media restart durability, production-origin browser review, accessibility review, and viewport review remain unexecuted—not passed.
+The required acceptance environment was not available in this session: no `DATABASE_URL`/MySQL 8+ service, verified production `NEXT_PUBLIC_SITE_URL`, operator-provided owner bootstrap input, deployment-host access, or provider-confirmed durable `MEDIA_STORAGE_DIR` was present. Playwright/browser automation was also not installed. Therefore migration/seed parity, authenticated workflows, contact persistence, media restart durability, production-origin browser review, accessibility review, and viewport review remain unexecuted—not passed.

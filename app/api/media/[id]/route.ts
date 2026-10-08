@@ -9,9 +9,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) return NextResponse.json({ error: "Image was not found." }, { status: 404 });
   try {
     const row = (await query<{ derivative_key: string }>(
-      `SELECT m.derivatives->>'preview' AS derivative_key FROM media m
+      `SELECT JSON_UNQUOTE(JSON_EXTRACT(m.derivatives,'$.preview')) AS derivative_key FROM media m
        WHERE m.id=$1 AND m.archived_at IS NULL AND m.processing_state='ready'
-       AND EXISTS (SELECT 1 FROM projects p WHERE p.status='published' AND p.published->>'image'=$2)`,
+       AND EXISTS (SELECT 1 FROM projects p WHERE p.status='published' AND JSON_UNQUOTE(JSON_EXTRACT(p.published,'$.image'))=$2)`,
       [id,`media:${id}`],
     )).rows[0];
     if (!row?.derivative_key) return NextResponse.json({ error: "Image was not found." }, { status: 404, headers: { "Cache-Control": "no-store" } });
