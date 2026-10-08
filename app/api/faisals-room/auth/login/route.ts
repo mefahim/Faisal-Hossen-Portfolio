@@ -1,13 +1,12 @@
-import argon2 from "argon2";
 import { NextResponse } from "next/server";
 import { query } from "@/lib/server/db";
-import { checkLoginThrottle, clearLoginFailures, recordLoginFailure, startOwnerSession, verifyPassword } from "@/lib/server/auth";
+import { checkLoginThrottle, clearLoginFailures, hashPassword, recordLoginFailure, startOwnerSession, verifyPassword } from "@/lib/server/auth";
 import { recordActivity } from "@/lib/server/audit";
 import { correlationId, RequestBodyError, readJsonBody, safeErrorMessage, sameOrigin } from "@/lib/server/security";
 import { loginSchema } from "@/lib/server/validation";
 
 export const runtime = "nodejs";
-const dummyHash = argon2.hash("not-a-real-owner-password-used-only-for-timing");
+const dummyHash = hashPassword("not-a-real-owner-password-used-only-for-timing");
 
 export async function POST(request: Request) {
   if (!sameOrigin(request)) return NextResponse.json({ error: "Request origin could not be verified." }, { status: 403 });

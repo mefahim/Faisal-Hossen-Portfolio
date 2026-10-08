@@ -1,24 +1,16 @@
 import "server-only";
-import argon2 from "argon2";
 import { randomBytes, randomUUID } from "node:crypto";
 import { cookies } from "next/headers";
 import { query, transaction } from "../db";
 import { clientAddress, digest, privateKey } from "../security";
+import { hashPassword, verifyPassword } from "../password-hashing";
+export { hashPassword, verifyPassword } from "../password-hashing";
 
 export const SESSION_COOKIE = "fr_session";
 const SESSION_TTL_SECONDS = 60 * 60 * 8;
-const ARGON_OPTIONS = { type: argon2.argon2id, memoryCost: 19_456, timeCost: 2, parallelism: 1 } as const;
 
 export type OwnerSession = { id: string; userId: string; email: string; expiresAt: Date };
 export class UnauthorizedError extends Error { constructor() { super("Authentication required."); this.name = "UnauthorizedError"; } }
-
-export async function hashPassword(password: string): Promise<string> {
-  if (password.length < 14 || password.length > 256) throw new Error("Password must be between 14 and 256 characters.");
-  return argon2.hash(password, ARGON_OPTIONS);
-}
-export async function verifyPassword(hash: string, password: string): Promise<boolean> {
-  try { return await argon2.verify(hash, password); } catch { return false; }
-}
 
 export async function getOwnerSession(): Promise<OwnerSession | null> {
   const store = await cookies();
