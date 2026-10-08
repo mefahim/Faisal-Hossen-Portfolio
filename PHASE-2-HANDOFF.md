@@ -10,10 +10,24 @@
 - Project name: `fahimsite`
 - Framework: Next.js App Router, React, TypeScript, Tailwind CSS
 - Package manager: pnpm 11
-- Main project directory in the original workspace: `/home/ubuntu/fahimsite`
-- Existing Preview origin used by Manus: `https://8328-i7j6a9b7bqwrqgf17usrz-e9d5581d.us4.manus.computer`
+- **Important:** the original Sandbox directory, local filesystem paths, Preview URL, runtime port, environment ID, and Manus workspace are not portable. They may all be different in the next agent’s device/environment. Do not reference or depend on `/home/ubuntu/fahimsite` or any previous Preview origin.
+- After cloning, use the actual checkout directory reported by the current environment. Discover the current runtime/Preview URL through that environment’s own web tooling, if available.
 - Existing platform logo metadata is in `app.config.ts`; do not remove it.
-- The repository is already connected to a GitHub target. Push normal commits to `origin/main` or to the GitHub repository’s `main` branch, depending on the agent environment. Never force-push.
+- Push normal commits to the checked-out repository’s `main` branch using the currently configured GitHub authentication. Never force-push, delete branches, or assume that an old remote name exists.
+
+## Required access and skills for the next Manus AI agent
+
+The user will provide access to only the GitHub repository and, if needed, the Google Drive folder. That is sufficient because the current handoff commit already contains the extracted source documents and project images. The next agent must not require access to the original Sandbox, original project directory, or old Preview URL.
+
+Before implementation, the next Manus agent should read these skills in its own environment:
+
+1. **`webdev`** — mandatory for continuing the Next.js website, using the environment’s project tooling, diagnostics, preview, checkpoints, and Git workflow.
+2. **`webdev-seo`** — mandatory for the new `/work`, `/work/[slug]`, `/about`, and `/contact` routes, route metadata, canonical behavior, sitemap, robots, and crawler-visible HTML.
+3. **`image-processing`** — recommended when inspecting, resizing, compressing, or validating the supplied PNG assets. Do not generate replacement images or alter Fahim’s identity.
+4. **`gws-best-practices`** — read only if the next agent needs to re-open or verify the Google Drive source folder using the Google Workspace CLI. The checked-in JSON documents and PNG assets are already sufficient for implementation.
+5. **`office-documents`** — optional only if the next agent needs to inspect or convert Google-exported document files beyond the checked-in JSON. It is not required for the normal Phase 2 implementation.
+
+No new custom skill needs to be created for this task. The existing Manus skills above cover the work. If the new environment uses a local-development workflow, the agent should also follow that environment’s `webdev-worklocally` rules before initializing or attaching a local project; it must not assume the previous environment’s managed project state is available.
 
 ## Exact instruction to the next AI agent
 
