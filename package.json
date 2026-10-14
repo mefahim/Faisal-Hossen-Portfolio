@@ -14,6 +14,9 @@
     "test": "NODE_OPTIONS='--conditions=react-server' tsx --test tests/*.test.ts"
   },
   "packageManager": "pnpm@11.0.0",
+  "pnpm": {
+    "onlyBuiltDependencies": ["esbuild", "sharp"]
+  },
   "dependencies": {
     "hash-wasm": "4.12.0",
     "lucide-react": "^0.468.0",
