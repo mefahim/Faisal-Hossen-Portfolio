@@ -95,6 +95,9 @@ export async function consumeOAuthState(state: string, provider: string): Promis
   // single-use DELETE commits even when validation fails below.
   // Expiry is evaluated with the database clock (expires_at > CURRENT_TIMESTAMP)
   // to avoid false positives from app/DB clock skew.
+  // Decryption happens OUTSIDE the transaction: if the stored verifier cannot
+  // be decrypted (wrong key, corrupted data), the already-consumed row must NOT
+  // be restored by a rollback — single-use is preserved.
   const result = await transaction(async (client) => {
     const found = await client.query<StateRow & { is_valid: number }>(
       `SELECT provider, encrypted_verifier,
@@ -116,10 +119,11 @@ export async function consumeOAuthState(state: string, provider: string): Promis
     }
     const encrypted =
       typeof row.encrypted_verifier === "string" ? row.encrypted_verifier : row.encrypted_verifier.toString("utf8");
-    return { ok: true as const, verifier: decryptToken(encrypted) };
+    return { ok: true as const, encrypted };
   });
   if (!result.ok) throw new Error(result.reason);
-  return result.verifier;
+  // Outside the transaction: decryption failure cannot restore the consumed row.
+  return decryptToken(result.encrypted);
 }
 
 /**

@@ -128,6 +128,18 @@ test("verifier is encrypted at rest with the configured key", { skip: !dbAvailab
   await consumeOAuthState(c.state, "ga4"); // cleanup
 });
 
+test("decrypt failure preserves single-use (corrupted verifier)", { skip: !dbAvailable }, async () => {
+  const c = await createOAuthChallenge("ga4");
+  // Corrupt the stored verifier directly (simulates wrong key / tampered data).
+  await query("UPDATE oauth_states SET encrypted_verifier=$1 WHERE state=$2", ["not-valid-encrypted-data", c.state]);
+  await assert.rejects(() => consumeOAuthState(c.state, "ga4"), /Decryption failed|Malformed/);
+  // Single-use preserved: the row must NOT be restored by a rollback.
+  const after = await query("SELECT state FROM oauth_states WHERE state=$1", [c.state]);
+  assert.equal(after.rowCount, 0, "state row must stay deleted after decrypt failure");
+  // And it cannot be retried.
+  await assert.rejects(() => consumeOAuthState(c.state, "ga4"), /Invalid or expired/);
+});
+
 test("DB teardown: clear oauth_states", { skip: !dbAvailable }, async () => {
   await query("DELETE FROM oauth_states");
   await _closePool();

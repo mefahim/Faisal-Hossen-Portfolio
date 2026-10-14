@@ -1,7 +1,7 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
 import { requireOwner, UnauthorizedError } from "../auth";
-import { query, transaction, type DbClient } from "../db";
+import { query, transaction, transactionWithConnectionControl, type DbClient } from "../db";
 import { decryptToken, encryptToken, isEncryptionAvailable } from "./encryption";
 
 /**
@@ -67,7 +67,11 @@ export type TokenRevokerFn = (refreshToken: string) => Promise<void>;
 
 let exchangeImpl: TokenExchangeFn | null = null;
 let refreshImpl: TokenRefreshFn | null = null;
-let revokerImpl: TokenRevokerFn | null = null;
+/**
+ * L1: revoker override. `undefined` (default) means "use the real server-side
+ * revocation"; `null` disables revocation; a function overrides it (tests).
+ */
+let revokerImpl: TokenRevokerFn | null | undefined = undefined;
 
 /** Phase B will register the real Google token exchange implementation. */
 export function _setTokenExchange(fn: TokenExchangeFn | null): void {
@@ -82,6 +86,17 @@ export function _setTokenRefresh(fn: TokenRefreshFn | null): void {
 /** Phase B will register the real Google token revocation implementation. */
 export function _setTokenRevoker(fn: TokenRevokerFn | null): void {
   revokerImpl = fn;
+}
+
+/** Test-only: restore default revoker resolution (real implementation). */
+export function _clearTokenRevoker(): void {
+  revokerImpl = undefined;
+}
+
+/** Resolve the effective revoker: override, disabled, or real implementation. */
+export function _resolveRevoker(): TokenRevokerFn | null {
+  if (revokerImpl !== undefined) return revokerImpl;
+  return revokeGoogleToken;
 }
 
 /**
@@ -165,8 +180,15 @@ async function acquireRefreshLock(client: DbClient, provider: string): Promise<b
   return result.rows[0]?.acquired === 1;
 }
 
-async function releaseRefreshLock(client: DbClient, provider: string): Promise<void> {
-  await client.query("SELECT RELEASE_LOCK($1)", [refreshLockName(provider)]).catch(() => undefined);
+async function releaseRefreshLock(client: DbClient, provider: string): Promise<boolean> {
+  try {
+    const result = await client.query<{ released: number | null }>("SELECT RELEASE_LOCK($1) AS released", [
+      refreshLockName(provider),
+    ]);
+    return result.rows[0]?.released === 1;
+  } catch {
+    return false;
+  }
 }
 
 type PersistTokensInput = {
@@ -281,7 +303,10 @@ export async function getValidAccessToken(provider: string, actorId: string): Pr
     return decryptToken(tokenToString(row.encrypted_access_token));
   }
   // Slow path: coordinated refresh under a cross-process lock.
-  return transaction(async (client) => {
+  // Uses transactionWithConnectionControl so a failed lock release destroys
+  // the connection instead of returning a potentially lock-holding connection
+  // to the pool.
+  return transactionWithConnectionControl(async (client, control) => {
     const locked = await acquireRefreshLock(client, provider);
     if (!locked) {
       throw new Error("Could not acquire token refresh lock. Please retry.");
@@ -314,7 +339,10 @@ export async function getValidAccessToken(provider: string, actorId: string): Pr
       });
       return fresh.accessToken;
     } finally {
-      await releaseRefreshLock(client, provider);
+      // If the lock cannot be released, the connection may still hold it.
+      // Destroy the connection so the leaked lock cannot block the pool.
+      const released = await releaseRefreshLock(client, provider);
+      if (!released) control.destroyConnection = true;
     }
   });
 }
@@ -349,7 +377,8 @@ export async function disconnectProvider(provider: string, actorId: string): Pro
 
   // L1: best-effort server-side revocation BEFORE local deletion.
   // Revocation failure must never skip local deletion; no token material is logged.
-  if (revokerImpl) {
+  const revoker = _resolveRevoker();
+  if (revoker) {
     const existing = (
       await query<{ encrypted_refresh_token: string | Buffer }>(
         "SELECT encrypted_refresh_token FROM provider_tokens WHERE provider=$1",
@@ -359,7 +388,7 @@ export async function disconnectProvider(provider: string, actorId: string): Pro
     if (existing) {
       try {
         const refreshToken = decryptToken(tokenToString(existing.encrypted_refresh_token));
-        await revokerImpl(refreshToken);
+        await revoker(refreshToken);
       } catch {
         // Best-effort only: local deletion proceeds regardless.
         // Intentionally no details logged (must never leak token material).
@@ -377,6 +406,7 @@ export async function disconnectProvider(provider: string, actorId: string): Pro
 export async function setPropertyId(provider: string, propertyId: string, actorId: string): Promise<void> {
   const session = await resolveSession();
   if (session.userId !== actorId) throw new UnauthorizedError();
+  assertSupportedProvider(provider);
   const normalized = normalizePropertyId(propertyId);
   const result = await query("UPDATE provider_tokens SET property_id=$1 WHERE provider=$2", [normalized, provider]);
   if (result.rowCount === 0) throw new Error(`Provider '${provider}' is not connected.`);

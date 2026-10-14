@@ -20,11 +20,14 @@ import {
   setPropertyId,
   _setTokenRefresh,
   _setTokenRevoker,
+  _clearTokenRevoker,
+  _resolveRevoker,
+  revokeGoogleToken,
   _setSessionOverride,
   _clearSessionOverride,
   needsRefresh,
 } from "../lib/server/analytics/tokens";
-import { query, transaction, _closePool } from "../lib/server/db";
+import { query, transaction, transactionWithConnectionControl, _closePool } from "../lib/server/db";
 import { generateTestEncryptionKey, isTestDatabaseAvailable, runMigrations } from "./db-test-utils";
 
 const dbAvailable = isTestDatabaseAvailable();
@@ -139,6 +142,23 @@ test("setPropertyId updates and validates", skipNoDb, async () => {
   await assert.rejects(() => setPropertyId("ga4", "not-a-property", ACTOR), /Invalid GA4 property/);
 });
 
+test("setPropertyId rejects unsupported providers (L3 regression)", skipNoDb, async () => {
+  await assert.rejects(() => setPropertyId("facebook", "123", ACTOR), /Unsupported provider/);
+  await assert.rejects(() => setPropertyId("", "123", ACTOR), /Unsupported provider/);
+});
+
+test("revoker resolves to real implementation by default, mock/null when set (L1)", skipNoDb, async () => {
+  _clearTokenRevoker();
+  assert.equal(_resolveRevoker(), revokeGoogleToken, "default must be the real server-side revoker");
+  const mock = async () => undefined;
+  _setTokenRevoker(mock);
+  assert.equal(_resolveRevoker(), mock);
+  _setTokenRevoker(null);
+  assert.equal(_resolveRevoker(), null, "explicit null must disable revocation");
+  _clearTokenRevoker(); // restore default (real); subsequent tests set their own
+  _setTokenRevoker(null); // keep disabled for the remaining tests (no live calls)
+});
+
 test("getConnectionStatus returns metadata only, never tokens", skipNoDb, async () => {
   const status = await getConnectionStatus("ga4", ACTOR);
   assert.ok(status);
@@ -211,6 +231,58 @@ test("owner authorization is enforced (fail-closed)", skipNoDb, async () => {
   _setSessionOverride({ userId: ACTOR });
   await assert.rejects(() => storeTokens("ga4", { accessToken: "a", refreshToken: "r", expiresAt: futureExpiry(60) }, OTHER_ACTOR), /Authentication required/);
   await assert.rejects(() => getConnectionStatus("ga4", OTHER_ACTOR), /Authentication required/);
+});
+
+test("transactionWithConnectionControl destroys connection on request", skipNoDb, async () => {
+  // Capture the connection ID used inside, request destruction, then verify
+  // that connection is gone from the server process list (with retries: the
+  // server needs a moment to process the disconnect).
+  let usedId: number | null = null;
+  await transactionWithConnectionControl(async (client, control) => {
+    const r = await client.query<{ id: number }>("SELECT CONNECTION_ID() AS id");
+    usedId = r.rows[0].id;
+    control.destroyConnection = true;
+    return "done";
+  });
+  assert.ok(usedId !== null);
+  let remaining = 1;
+  for (let i = 0; i < 20 && remaining > 0; i++) {
+    await new Promise((r) => setTimeout(r, 50));
+    const stillThere = await query("SELECT ID AS id FROM INFORMATION_SCHEMA.PROCESSLIST WHERE ID=$1", [usedId]);
+    remaining = stillThere.rowCount;
+  }
+  assert.equal(remaining, 0, "destroyed connection must not remain on the server");
+});
+
+test("transactionWithConnectionControl reuses connection when not destroyed", skipNoDb, async () => {
+  let firstId: number | null = null;
+  let secondId: number | null = null;
+  await transactionWithConnectionControl(async (client) => {
+    const r = await client.query<{ id: number }>("SELECT CONNECTION_ID() AS id");
+    firstId = r.rows[0].id;
+    return "one";
+  });
+  await transactionWithConnectionControl(async (client) => {
+    const r = await client.query<{ id: number }>("SELECT CONNECTION_ID() AS id");
+    secondId = r.rows[0].id;
+    return "two";
+  });
+  // Pool reuse is not guaranteed, but the server must still be reachable and
+  // both connections must have been valid.
+  assert.ok(firstId !== null && secondId !== null);
+});
+
+test("GET_LOCK / RELEASE_LOCK round-trip via SQL", skipNoDb, async () => {
+  const lockName = `faisals_room:test:${Date.now()}`;
+  await transaction(async (client) => {
+    const acquired = await client.query<{ ok: number | null }>("SELECT GET_LOCK($1, 5) AS ok", [lockName]);
+    assert.equal(acquired.rows[0]?.ok, 1, "lock must be acquirable");
+    const released = await client.query<{ ok: number | null }>("SELECT RELEASE_LOCK($1) AS ok", [lockName]);
+    assert.equal(released.rows[0]?.ok, 1, "lock must be releasable");
+    // Releasing a non-held lock returns 0/NULL (not 1).
+    const releasedAgain = await client.query<{ ok: number | null }>("SELECT RELEASE_LOCK($1) AS ok", [lockName]);
+    assert.notEqual(releasedAgain.rows[0]?.ok, 1, "double release must not report success");
+  });
 });
 
 test("DB teardown", { skip: !dbAvailable }, async () => {
