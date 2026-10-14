@@ -9,7 +9,11 @@ import { AnalyticsDashboardClient } from "./AnalyticsDashboard";
  * Shows honest connection states. Real GA4 data integration arrives in
  * Phase B after Google Cloud OAuth credentials are configured.
  */
-export default async function AnalyticsPage() {
+export default async function AnalyticsPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ oauth?: string }>;
+}) {
   let owner;
   try {
     owner = await getOwnerSession();
@@ -28,6 +32,9 @@ export default async function AnalyticsPage() {
     connected = false;
   }
 
+  const params = searchParams ? await searchParams : undefined;
+  const oauth = params?.oauth;
+
   return (
     <>
       <div className="room-page-heading">
@@ -41,7 +48,9 @@ export default async function AnalyticsPage() {
         </div>
         <span className="room-published-badge"><span aria-hidden="true" />Private workspace</span>
       </div>
-      <AnalyticsDashboardClient initialState={connected ? { kind: "loading" } : { kind: "not_connected" }} />
+      <AnalyticsDashboardClient
+        initialState={connected ? { kind: "loading" } : { kind: "not_connected", oauth }}
+      />
     </>
   );
 }
