@@ -28,7 +28,7 @@ export default async function ContactPage() {
   return (
     <>
       <Header />
-      <main className="page-shell contact-page">
+      <main id="main-content" className="page-shell contact-page">
         <section className="section-shell page-hero contact-hero">
           <Reveal>
             <p className="eyebrow"><span className="status-dot" aria-hidden="true" /> Contact / start with the problem</p>

@@ -23,7 +23,7 @@ export default async function AboutPage() {
   return (
     <>
       <Header />
-      <main className="page-shell about-page">
+      <main id="main-content" className="page-shell about-page">
         <section className="section-shell page-hero about-hero">
           <Reveal>
             <p className="eyebrow"><span className="status-dot" aria-hidden="true" /> About / how the work is shaped</p>
