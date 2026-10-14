@@ -378,11 +378,11 @@ export async function getRedirectAudit(redirectId?: string, limit = 100): Promis
   const session = await requireOwner();
   void session;
   const rows = redirectId
-    ? (await query<{ id: string; redirect_id: string | null; action: string; old_value: string | null; new_value: string | null; actor_id: string; created_at: Date }>(
+    ? (await query<{ id: string; redirect_id: string | null; action: string; old_value: string | Record<string, unknown> | null; new_value: string | Record<string, unknown> | null; actor_id: string; created_at: Date }>(
         "SELECT id, redirect_id, `action`, old_value, new_value, actor_id, created_at FROM redirect_audit WHERE redirect_id=$1 ORDER BY created_at DESC LIMIT $2",
         [redirectId, Math.min(limit, 500)],
       )).rows
-    : (await query<{ id: string; redirect_id: string | null; action: string; old_value: string | null; new_value: string | null; actor_id: string; created_at: Date }>(
+    : (await query<{ id: string; redirect_id: string | null; action: string; old_value: string | Record<string, unknown> | null; new_value: string | Record<string, unknown> | null; actor_id: string; created_at: Date }>(
         "SELECT id, redirect_id, `action`, old_value, new_value, actor_id, created_at FROM redirect_audit ORDER BY created_at DESC LIMIT $1",
         [Math.min(limit, 500)],
       )).rows;
@@ -390,25 +390,42 @@ export async function getRedirectAudit(redirectId?: string, limit = 100): Promis
     id: r.id,
     redirect_id: r.redirect_id,
     action: r.action,
-    old_value: r.old_value ? (JSON.parse(r.old_value) as Record<string, unknown>) : null,
-    new_value: r.new_value ? (JSON.parse(r.new_value) as Record<string, unknown>) : null,
+    old_value: parseJsonColumn(r.old_value),
+    new_value: parseJsonColumn(r.new_value),
     actor_id: r.actor_id,
     created_at: r.created_at.toISOString(),
   }));
+}
+
+// mysql2 automatically parses MySQL JSON columns into objects.
+// Handle both string (defensive) and already-parsed object forms.
+function parseJsonColumn(value: string | Record<string, unknown> | null): Record<string, unknown> | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value === "string") {
+    try {
+      return JSON.parse(value) as Record<string, unknown>;
+    } catch {
+      return null;
+    }
+  }
+  return value as Record<string, unknown>;
 }
 
 export async function revertRedirect(auditId: string, actorId: string): Promise<RedirectRule> {
   const session = await requireOwner();
   if (session.userId !== actorId) throw new UnauthorizedError();
   return transaction(async (client) => {
-    const entry = (await client.query<{ redirect_id: string | null; action: string; old_value: string | null }>(
+    const entry = (await client.query<{ redirect_id: string | null; action: string; old_value: string | Record<string, unknown> | null }>(
       "SELECT redirect_id, `action`, old_value FROM redirect_audit WHERE id=$1",
       [auditId],
     )).rows[0];
     if (!entry || !entry.old_value || !entry.redirect_id) {
       throw new Error("This audit entry cannot be reverted (no prior state recorded).");
     }
-    const prior = JSON.parse(entry.old_value) as { source_path: string; target_url: string; status_code: number };
+    const prior = parseJsonColumn(entry.old_value) as unknown as { source_path: string; target_url: string; status_code: number };
+    if (!prior || typeof prior.source_path !== "string") {
+      throw new Error("This audit entry has an invalid prior state and cannot be reverted.");
+    }
     // Validate the restored state BEFORE writing. Atomic failure if invalid.
     const valid = validateRuleInput(prior.source_path, prior.target_url, prior.status_code);
     await validateAgainstExisting(valid.source_path, valid.target_url, valid.source_path);
@@ -474,13 +491,14 @@ export async function bulkEnableRedirects(actorId: string): Promise<{ affected_c
     const rules = (await client.query<{ id: string; source_path: string }>("SELECT id, source_path FROM redirects WHERE is_active=FALSE")).rows;
     let restored = 0;
     for (const rule of rules) {
-      const lastActive = (await client.query<{ new_value: string | null }>(
+      const lastActive = (await client.query<{ new_value: string | Record<string, unknown> | null }>(
         "SELECT new_value FROM redirect_audit WHERE redirect_id=$1 AND `action` IN ('created','updated','enabled','reverted','imported') ORDER BY created_at DESC LIMIT 1",
         [rule.id],
       )).rows[0];
       // Only re-enable if the rule was previously active (per audit history).
       // Rules never activated remain inactive — safe default.
-      const wasActive = lastActive?.new_value ? (JSON.parse(lastActive.new_value) as { is_active?: boolean }).is_active === true : false;
+      const parsed = parseJsonColumn(lastActive?.new_value ?? null) as unknown as { is_active?: boolean } | null;
+      const wasActive = parsed?.is_active === true;
       if (wasActive) {
         await client.query("UPDATE redirects SET is_active=TRUE, updated_at=now() WHERE id=$1", [rule.id]);
         await writeAudit(client, {
