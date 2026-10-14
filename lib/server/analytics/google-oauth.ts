@@ -71,11 +71,12 @@ export type AuthorizationRequest = {
  * authorization URL. The caller redirects the browser to `url`.
  *
  * The state token is the CSRF protection for the callback; the PKCE verifier
- * is encrypted at rest and never exposed.
+ * is encrypted at rest and never exposed. The ownerId records who initiated
+ * the flow for token attribution (session-resilient).
  */
-export async function buildAuthorizationUrl(provider: string): Promise<AuthorizationRequest> {
+export async function buildAuthorizationUrl(provider: string, ownerId?: string): Promise<AuthorizationRequest> {
   const config = getOAuthConfig();
-  const { state, codeChallenge } = await createOAuthChallenge(provider);
+  const { state, codeChallenge } = await createOAuthChallenge(provider, ownerId);
   const params = new URLSearchParams({
     client_id: config.clientId,
     redirect_uri: config.redirectUri,

@@ -56,16 +56,19 @@ function requireStateEncryption(): void {
  * Create and persist a fresh OAuth challenge.
  * The PKCE verifier is encrypted before storage. Expired states are purged
  * opportunistically (best-effort; creation never fails because of cleanup).
+ * The ownerId (if provided) records who initiated the flow, so the callback
+ * can attribute tokens even if the owner's session expired during the
+ * Google authorization step.
  */
-export async function createOAuthChallenge(provider: string): Promise<OAuthChallenge> {
+export async function createOAuthChallenge(provider: string, ownerId?: string): Promise<OAuthChallenge> {
   assertSupportedProvider(provider);
   requireStateEncryption();
   const { state, codeVerifier, codeChallenge } = generateChallengeParts();
   const encryptedVerifier = encryptToken(codeVerifier);
   await query(
-    `INSERT INTO oauth_states(state, provider, encrypted_verifier, expires_at)
-     VALUES($1, $2, $3, DATE_ADD(CURRENT_TIMESTAMP(3), INTERVAL 10 MINUTE))`,
-    [state, provider, encryptedVerifier],
+    `INSERT INTO oauth_states(state, provider, encrypted_verifier, expires_at, owner_id)
+     VALUES($1, $2, $3, DATE_ADD(CURRENT_TIMESTAMP(3), INTERVAL 10 MINUTE), $4)`,
+    [state, provider, encryptedVerifier, ownerId ?? null],
   );
   // Opportunistic cleanup of expired states. Best-effort only.
   await query("DELETE FROM oauth_states WHERE expires_at <= CURRENT_TIMESTAMP(3)").catch(() => undefined);
@@ -75,18 +78,26 @@ export async function createOAuthChallenge(provider: string): Promise<OAuthChall
 type StateRow = {
   provider: string;
   encrypted_verifier: string | Buffer;
+  owner_id: string | null;
+};
+
+export type ConsumedState = {
+  /** Decrypted PKCE verifier. */
+  verifier: string;
+  /** Owner who initiated the flow (may be null for legacy states). */
+  ownerId: string | null;
 };
 
 /**
  * Atomically validate and consume a state token. Returns the decrypted PKCE
- * verifier on success. Throws on unknown, expired, reused, or
- * provider-mismatched state.
+ * verifier and the initiating owner's ID on success. Throws on unknown,
+ * expired, reused, or provider-mismatched state.
  *
  * Single-use is enforced by the database: the row is locked (FOR UPDATE) and
  * deleted inside a transaction, so concurrent callbacks serialize and only
  * the first one succeeds.
  */
-export async function consumeOAuthState(state: string, provider: string): Promise<string> {
+export async function consumeOAuthState(state: string, provider: string): Promise<ConsumedState> {
   assertSupportedProvider(provider);
   if (!state || typeof state !== "string") {
     throw new Error("Invalid or expired OAuth state.");
@@ -100,7 +111,7 @@ export async function consumeOAuthState(state: string, provider: string): Promis
   // be restored by a rollback — single-use is preserved.
   const result = await transaction(async (client) => {
     const found = await client.query<StateRow & { is_valid: number }>(
-      `SELECT provider, encrypted_verifier,
+      `SELECT provider, encrypted_verifier, owner_id,
               expires_at > CURRENT_TIMESTAMP(3) AS is_valid
        FROM oauth_states WHERE state=$1 FOR UPDATE`,
       [state],
@@ -119,11 +130,11 @@ export async function consumeOAuthState(state: string, provider: string): Promis
     }
     const encrypted =
       typeof row.encrypted_verifier === "string" ? row.encrypted_verifier : row.encrypted_verifier.toString("utf8");
-    return { ok: true as const, encrypted };
+    return { ok: true as const, encrypted, ownerId: row.owner_id };
   });
   if (!result.ok) throw new Error(result.reason);
   // Outside the transaction: decryption failure cannot restore the consumed row.
-  return decryptToken(result.encrypted);
+  return { verifier: decryptToken(result.encrypted), ownerId: result.ownerId };
 }
 
 /**

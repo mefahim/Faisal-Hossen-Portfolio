@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { getOwnerSession } from "@/lib/server/auth";
 import { consumeOAuthState } from "@/lib/server/analytics/oauth-state";
 import { exchangeCodeForTokens, getOAuthConfig, OAuthConfigError } from "@/lib/server/analytics/google-oauth";
 import "@/lib/server/analytics/register-google-oauth";
@@ -77,22 +76,24 @@ export async function GET(request: Request) {
     const config = getOAuthConfig();
 
     // Atomic single-use consumption. Throws on unknown/expired/reused/mismatched state.
-    const codeVerifier = await consumeOAuthState(state, "ga4");
-
-    // Exchange the authorization code. The code is single-use at Google too.
-    const tokens = await exchangeCodeForTokens(code, codeVerifier, config.redirectUri);
-
-    // Persist encrypted tokens. Requires an owner session to attribute the
-    // connection — the person completing the flow must be the owner.
-    // If no owner session exists, we cannot safely attribute the tokens.
-    const owner = await getOwnerSession().catch(() => null);
-    if (!owner) {
-      console.error(`[${requestId}] OAuth callback completed but no owner session; tokens discarded.`);
+    // The returned ownerId identifies who initiated the flow — no live owner
+    // session is required, so tokens are stored even if the session expired
+    // while the owner was on Google's authorization pages. The unguessable,
+    // single-use state token is the authentication for this callback.
+    const { verifier: codeVerifier, ownerId } = await consumeOAuthState(state, "ga4");
+    if (!ownerId) {
+      // Legacy states (created before owner tracking) cannot be attributed.
+      console.error(`[${requestId}] OAuth callback completed but state has no owner; tokens discarded.`);
       return NextResponse.redirect(dashboardUrl(request, new URLSearchParams({ oauth: "session_expired" })), {
         headers: noStore,
       });
     }
-    await storeTokens("ga4", tokens, owner.userId, undefined, { isRefresh: false });
+
+    // Exchange the authorization code. The code is single-use at Google too.
+    const tokens = await exchangeCodeForTokens(code, codeVerifier, config.redirectUri);
+
+    // Persist encrypted tokens, attributed to the owner who initiated the flow.
+    await storeTokens("ga4", tokens, ownerId, undefined, { isRefresh: false });
 
     return NextResponse.redirect(dashboardUrl(request, new URLSearchParams({ oauth: "connected" })), {
       headers: noStore,
