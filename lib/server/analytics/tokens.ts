@@ -239,10 +239,17 @@ export async function storeTokens(
   tokens: TokenSet,
   actorId: string,
   propertyId?: string,
-  options?: { isRefresh?: boolean },
+  options?: { isRefresh?: boolean; skipSessionCheck?: boolean },
 ): Promise<void> {
-  const session = await resolveSession();
-  if (session.userId !== actorId) throw new UnauthorizedError();
+  // Session check: normally the caller must have a live owner session matching
+  // actorId. The OAuth callback skips this because there may be no live session
+  // (expired during the Google flow) — authorization comes from the unguessable
+  // single-use state token consumed before this call, which binds actorId to
+  // the flow initiator.
+  if (!options?.skipSessionCheck) {
+    const session = await resolveSession();
+    if (session.userId !== actorId) throw new UnauthorizedError();
+  }
   requireEncryption();
   assertSupportedProvider(provider);
   const encAccess = encryptToken(tokens.accessToken);

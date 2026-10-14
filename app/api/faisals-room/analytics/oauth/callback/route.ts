@@ -93,7 +93,9 @@ export async function GET(request: Request) {
     const tokens = await exchangeCodeForTokens(code, codeVerifier, config.redirectUri);
 
     // Persist encrypted tokens, attributed to the owner who initiated the flow.
-    await storeTokens("ga4", tokens, ownerId, undefined, { isRefresh: false });
+    // skipSessionCheck: authorization comes from the consumed single-use state
+    // token (bound to ownerId), not from a live session.
+    await storeTokens("ga4", tokens, ownerId, undefined, { isRefresh: false, skipSessionCheck: true });
 
     return NextResponse.redirect(dashboardUrl(request, new URLSearchParams({ oauth: "connected" })), {
       headers: noStore,
