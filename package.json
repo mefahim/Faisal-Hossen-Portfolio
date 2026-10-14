@@ -17,9 +17,6 @@
   "engines": {
     "node": "22.x"
   },
-  "pnpm": {
-    "onlyBuiltDependencies": ["esbuild", "sharp"]
-  },
   "dependencies": {
     "hash-wasm": "4.12.0",
     "lucide-react": "^0.468.0",
