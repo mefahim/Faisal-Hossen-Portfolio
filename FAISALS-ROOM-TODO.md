@@ -1,6 +1,36 @@
 # Faisal's Room — Implementation TODO
 
-**Status:** Phase 1 source and local acceptance defects have been addressed. Isolated MySQL 8.0.46 and the actual Hostinger MariaDB 11.8.9 passed migration/seed/parity; the production owner bootstrap and rollback were also verified. The first Passenger release candidate returned HTTP 500 and was rolled back. **2026-10-14: Production login restored and verified live.** Root cause was an unencoded `#` in the `DATABASE_URL` password (mysql2 `new URL()` threw `ERR_INVALID_URL` → every DB op failed → login 503). Fixed via hPanel env var (`#` → `%23`) + owner password reset (hash-wasm argon2id). Full auth flow verified: login 200 + session cookie, authenticated `/faisals-room` 200, anonymous 307 → login, wrong password 401, logout 200 + session invalidated. The working server tree (hash-wasm@4.12.0, `HOSTINGER-ARGON2-FIX.md`) is preserved on branch `backup/faisals-room-working-login` (commit `75de5ef`); GitHub push pending write permission for the Muse GitHub App. `CONTENT_SOURCE=files` remains active. Production media durability across a release and the deployed browser/accessibility matrix remain pending. Phase 2 and Phase 3 have not been started.
+**Status (2026-10-14):** PR #1 merged to `main` (d3ce805). Production login restored and verified live. Phase 1 is **Partially Verified** — not fully accepted. Phase 2 and Phase 3 have not started. `CONTENT_SOURCE=files` unchanged.
+
+## Phase 1 Acceptance Checklist (2026-10-14)
+
+**Git & Code:**
+- [x] PASS — Merged `main` at d3ce805 verified (contains hash-wasm, a11y fixes, docs)
+- [x] PASS — Typecheck clean, 8/8 tests pass, production build succeeds
+- [x] PASS — No secrets in diff; public portfolio behavior unchanged
+
+**Authentication & Security (production, live):**
+- [x] PASS — Correct login: 200 + session cookie
+- [x] PASS — Wrong password: 401
+- [x] PASS — Authenticated dashboard: 200; Anonymous: 307 → login; Anonymous API: 401
+- [x] PASS — CSRF (wrong origin): 403 blocked
+- [x] PASS — Logout: 200, session invalidated (307 after)
+- [x] PASS — hash-wasm argon2id verifies legacy hashes; password policy enforced (14-256 chars)
+
+**Media Durability:**
+- [x] PASS — Test upload survived application restart; storage at `/home/u263467780/faisals-room-media` (outside `hbuilds/`)
+- [ ] NOT VERIFIED — Survival across actual new production release (would require deployment; architectural proof shows releases cannot touch the media dir)
+
+**Browser & Accessibility:**
+- [x] PASS — Desktop rendering clean; keyboard focus visible; reduced-motion respected; form labels present; skip-link added; media buttons have unique labels
+- [ ] NOT VERIFIED — Full 7-width live viewport matrix (browser tooling cannot resize; local Chromium has no network access; CSS analysis shows no overflow risks)
+
+**Database & Content:**
+- [x] PASS — `CONTENT_SOURCE=files` confirmed; DB accessible; auth flows prove users/sessions tables work
+- [x] PASS — Public routes (/, /work, /about, /contact) return 200; robots.txt correct; sitemap valid
+
+**Production Deployment:**
+- [ ] NOT VERIFIED — Production runs pre-merge working version (hash-wasm, no a11y fixes); merged `main` (d3ce805) not yet deployed. Deployment requires authorization.
 
 ## Phase 1 — Foundation: secure Control Center and content publishing
 
