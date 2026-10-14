@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS provider_tokens (
   UNIQUE KEY provider_tokens_provider_uniq (provider)
 );
 
--- Cached GA4 report data (90-day retention; see lib/server/analytics/cache.ts)
+-- Cached GA4 report data (90-day retention; cache accessors to be added in a later step)
 -- Cache is keyed by (provider, property_id, date_range, report_type).
 CREATE TABLE IF NOT EXISTS analytics_cache (
   id CHAR(36) PRIMARY KEY,
