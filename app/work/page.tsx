@@ -26,7 +26,7 @@ export default async function WorkPage() {
   return (
     <>
       <Header />
-      <main className="page-shell work-page">
+      <main id="main-content" className="page-shell work-page">
         <section className="section-shell page-hero">
           <Reveal>
             <p className="eyebrow"><span className="status-dot" aria-hidden="true" /> Selected work / project notes</p>

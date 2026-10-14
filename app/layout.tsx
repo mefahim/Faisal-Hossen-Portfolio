@@ -20,7 +20,7 @@ export const metadata = siteMetadata;
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
-      <body className={`${sans.variable} ${display.variable}`}>{children}</body>
+      <body className={`${sans.variable} ${display.variable}`}><a href="#main-content" className="skip-link">Skip to main content</a>{children}</body>
     </html>
   );
 }

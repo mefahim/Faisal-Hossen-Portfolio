@@ -31,7 +31,7 @@ export default async function HomePage() {
   return (
     <>
       <Header />
-      <main id="top">
+      <main id="main-content">
         <section className="hero section-shell">
           <div className="hero-copy">
             <Reveal>
