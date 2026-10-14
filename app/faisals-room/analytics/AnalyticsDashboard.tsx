@@ -13,8 +13,15 @@ import { useState } from "react";
 type ConnectionState = "not_connected" | "loading" | "error";
 type DashboardState =
   | { kind: "not_connected"; oauth?: string }
+  | { kind: "connected"; propertyId: string | null }
   | { kind: "loading" }
   | { kind: "error"; message: string };
+
+type GA4Property = {
+  propertyId: string;
+  displayName: string;
+  accountName: string;
+};
 
 const OAUTH_MESSAGES: Record<string, { kind: "success" | "warning" | "error"; text: string }> = {
   connected: { kind: "success", text: "Google Analytics connected. Select a property to see data." },
@@ -115,6 +122,10 @@ export function AnalyticsDashboardClient({ initialState }: { initialState: Dashb
     );
   }
 
+  if (state.kind === "connected") {
+    return <PropertyPicker initialPropertyId={state.propertyId} />;
+  }
+
   if (state.kind === "loading") {
     return (
       <div role="status" aria-label="Loading analytics">
@@ -134,6 +145,137 @@ export function AnalyticsDashboardClient({ initialState }: { initialState: Dashb
     <div className="room-alert room-alert-warning" role="alert">
       <strong>Could not load analytics.</strong>{" "}
       {state.kind === "error" ? state.message : "An unexpected error occurred."}
+    </div>
+  );
+}
+
+function PropertyPicker({ initialPropertyId }: { initialPropertyId: string | null }) {
+  const [properties, setProperties] = useState<GA4Property[] | null>(null);
+  const [selected, setSelected] = useState(initialPropertyId ?? "");
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+
+  async function loadProperties() {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/faisals-room/analytics/properties");
+      const data = (await response.json()) as { properties?: GA4Property[]; error?: string };
+      if (!response.ok) throw new Error(data.error ?? "Could not load properties.");
+      setProperties(data.properties ?? []);
+      if ((data.properties ?? []).length === 0) {
+        setError("No GA4 properties found for this Google account.");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not load properties.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleSave() {
+    if (!selected) return;
+    setSaving(true);
+    setError(null);
+    setSaved(false);
+    try {
+      const response = await fetch("/api/faisals-room/analytics/property", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ propertyId: selected }),
+      });
+      const data = (await response.json()) as { error?: string };
+      if (!response.ok) throw new Error(data.error ?? "Could not save property.");
+      setSaved(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not save property.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDisconnect() {
+    if (!confirm("Disconnect Google Analytics? This revokes access and deletes stored tokens.")) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/faisals-room/analytics/disconnect", { method: "POST" });
+      const data = (await response.json()) as { error?: string };
+      if (!response.ok) throw new Error(data.error ?? "Could not disconnect.");
+      window.location.reload();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not disconnect.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div>
+      <div className="room-alert room-alert-info" role="status" style={{ marginBottom: "1.5rem" }}>
+        <strong>Connected.</strong> Select the GA4 property to display data for.
+      </div>
+      <section className="room-card" aria-label="Select GA4 property">
+        <h2 style={{ marginTop: 0 }}>GA4 Property</h2>
+        {error && (
+          <div className="room-alert room-alert-error" role="alert" style={{ marginBottom: "1rem" }}>
+            {error}
+          </div>
+        )}
+        {saved && (
+          <div className="room-alert room-alert-info" role="status" style={{ marginBottom: "1rem" }}>
+            Property saved.
+          </div>
+        )}
+        {properties === null ? (
+          <div className="room-editor-actions">
+            <button type="button" className="room-button" onClick={loadProperties} disabled={loading}>
+              {loading ? "Loading…" : "Load my GA4 properties"}
+            </button>
+          </div>
+        ) : (
+          <div>
+            <label htmlFor="ga4-property" className="room-editor-help" style={{ display: "block", marginBottom: "0.5rem" }}>
+              Choose a property:
+            </label>
+            <select
+              id="ga4-property"
+              value={selected}
+              onChange={(e) => setSelected(e.target.value)}
+              className="room-input"
+              style={{ marginBottom: "1rem", width: "100%" }}
+            >
+              <option value="">— Select —</option>
+              {properties.map((p) => (
+                <option key={p.propertyId} value={p.propertyId}>
+                  {p.displayName} ({p.propertyId}){p.accountName ? ` — ${p.accountName}` : ""}
+                </option>
+              ))}
+            </select>
+            <div className="room-editor-actions">
+              <button
+                type="button"
+                className="room-button room-button-primary"
+                onClick={handleSave}
+                disabled={!selected || saving}
+              >
+                {saving ? "Saving…" : "Save property"}
+              </button>
+              <button
+                type="button"
+                className="room-button"
+                onClick={handleDisconnect}
+                disabled={saving}
+                style={{ marginLeft: "0.5rem" }}
+              >
+                Disconnect
+              </button>
+            </div>
+          </div>
+        )}
+      </section>
     </div>
   );
 }
