@@ -196,6 +196,22 @@ function PropertyPicker({ initialPropertyId }: { initialPropertyId: string | nul
     }
   }
 
+  async function handleDisconnect() {
+    if (!confirm("Disconnect Google Analytics? This revokes access and deletes stored tokens.")) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/faisals-room/analytics/disconnect", { method: "POST" });
+      const data = (await response.json()) as { error?: string };
+      if (!response.ok) throw new Error(data.error ?? "Could not disconnect.");
+      window.location.reload();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not disconnect.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <div>
       <div className="room-alert room-alert-info" role="status" style={{ marginBottom: "1.5rem" }}>
@@ -246,6 +262,15 @@ function PropertyPicker({ initialPropertyId }: { initialPropertyId: string | nul
                 disabled={!selected || saving}
               >
                 {saving ? "Saving…" : "Save property"}
+              </button>
+              <button
+                type="button"
+                className="room-button"
+                onClick={handleDisconnect}
+                disabled={saving}
+                style={{ marginLeft: "0.5rem" }}
+              >
+                Disconnect
               </button>
             </div>
           </div>
