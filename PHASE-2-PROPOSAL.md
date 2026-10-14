@@ -48,6 +48,50 @@ A separate approved migration plan would be required to switch public reads to d
 - API: No middleware or route handler evaluates the `redirects` table. Imported rules are stored only. A `GET /api/faisals-room/redirects/preview?path=/x` endpoint returns what *would* happen (for testing), without performing the redirect.
 - Database: `is_active` column exists but is ignored by all request handling in Phase 2. A future migration would wire activation.
 
+**Owner decisions (confirmed):**
+- Target URLs: root-relative paths or absolute `https://` URLs only. No `http://`, no protocol-relative, no other schemes.
+- CSV import: duplicate `source_path` rows are rejected; existing database rules are never silently overwritten.
+- CSV import request body: JSON `{ "csv": "..." }` (not multipart).
+- Planning-only throughout Phase 2. No production activation or public traffic evaluation without separate explicit approval.
+
+**URL normalization (applied identically to create, update, CSV import, and audit revert):**
+- Trailing slashes: preserved as written. `/about` and `/about/` are distinct source paths. No silent stripping or appending.
+- Query strings: preserved as written in both source and target. `/page?a=1` and `/page?a=2` are distinct. Query strings are never dropped.
+- Percent-encoding: validated but not re-encoded. Invalid sequences (e.g., lone `%`) are rejected. `%2F` and `/` are treated as distinct — no silent decoding.
+- Case sensitivity: paths are case-sensitive. `/About` and `/about` are distinct source paths.
+- Absolute HTTPS URLs: hostname lowercased (per RFC); path, query, and fragment preserved exactly. Default port `:443` notation is rejected as non-canonical — use bare hostname.
+- Normalization never changes the meaning of a path silently. If two inputs normalize to the same value, the later one is rejected as a duplicate with an explanatory message.
+
+**Uniform validation across all write paths:**
+Create, update, CSV import, and audit revert all run the same validation pipeline: schema check → protected-path check → self-redirect check → loop detection (graph cycle check against current rules plus the proposed change) → chain-depth check (max 5 hops). Any failure rejects the operation.
+
+**Audit revert safety:**
+- Revert validates the proposed restored state through the full pipeline before writing.
+- If validation fails, the revert fails atomically: the transaction rolls back, current rules are unchanged, and the error names the specific failed check.
+- Successful reverts create a new audit entry (action `reverted`, referencing the source audit ID). History is append-only.
+
+**CSV import transactional behavior:**
+- Each row is validated independently before any write.
+- Valid rows are inserted in a single transaction; if any insert fails (e.g., race-condition duplicate), the entire import rolls back and the error is reported — no partial writes.
+- Each successfully imported row creates one `redirect_audit` entry (action `imported`).
+- Rejected rows (validation failure, in-file duplicate, DB duplicate) produce no audit entries and do not affect the transaction.
+- Response: `{ imported: number, rejected: [{ row, source_path, errors: string[] }] }`.
+
+**Bulk disable safety:**
+- `POST /api/faisals-room/redirects/bulk-disable` sets `is_active = FALSE` for all rows in one transaction.
+- Creates a single audit entry with `redirect_id = NULL`, action `bulk_disabled`, and `new_value: { affected_count }`.
+- Reversal: `POST /api/faisals-room/redirects/bulk-enable` restores each rule's prior `is_active` value from its most recent audit snapshot (not blanket `TRUE`). Each restoration is individually auditable.
+
+**Concurrency protection:**
+- `source_path` has a `UNIQUE` constraint at the database level — the single source of truth for duplicate prevention.
+- Create/update/import handlers use `INSERT ... ON DUPLICATE KEY UPDATE`-free logic: attempt `INSERT`, catch duplicate-key error, return a 409 with `"source_path already exists"`. No check-then-insert race.
+- Concurrent duplicate creation attempts: exactly one succeeds; others receive 409. No silent overwrite, no lost update.
+
+**Preview endpoint guarantee:**
+- `GET /api/faisals-room/redirects/preview?path=` always returns HTTP 200 with JSON for valid requests.
+- Response: `{ would_redirect: boolean, target: string | null, status_code: number | null, chain: string[], planning_only: true }`.
+- The endpoint never issues an HTTP 3xx redirect under any circumstance. Verified by test asserting response status is 200 and no `Location` header is present.
+
 #### 3. GA4 Integration (`/faisals-room/analytics`)
 - Server-side only. **No client-side gtag.js, no tracking cookies in Phase 2.**
 - OAuth2 with read-only scope: `https://www.googleapis.com/auth/analytics.readonly`
@@ -91,9 +135,25 @@ A separate approved migration plan would be required to switch public reads to d
 -- SEO drafts (planning only, not live)
 seo_drafts (id, page_path, field_name, draft_value, live_value, updated_by, updated_at)
 
--- Redirects
-redirects (id, source_path UNIQUE, target_url, status_code, is_active, created_by, created_at, updated_at)
-redirect_audit (id, redirect_id, action, old_value, new_value, actor, timestamp)
+-- Redirects (planning-only in Phase 2; no public traffic evaluation)
+redirects (id CHAR(36) PK, source_path VARCHAR(500) NOT NULL UNIQUE, target_url VARCHAR(2000) NOT NULL,
+  status_code SMALLINT NOT NULL CHECK IN (301,302,307,308), is_active BOOLEAN NOT NULL DEFAULT FALSE,
+  created_by CHAR(36) NOT NULL, created_at DATETIME(3), updated_at DATETIME(3))
+-- Uniqueness enforced at DB level (UNIQUE constraint). Application uses INSERT-catch-duplicate
+-- (never check-then-insert) so concurrent duplicate creation is safe: exactly one succeeds, others get 409.
+redirect_audit (id CHAR(36) PK, redirect_id CHAR(36) NULL, action VARCHAR(40) NOT NULL,
+  old_value JSON NULL, new_value JSON NULL, actor_id CHAR(36) NOT NULL, created_at DATETIME(3),
+  INDEX on redirect_id)
+-- Actions: created, updated, disabled, enabled, deleted, imported, reverted, bulk_disabled, bulk_enabled.
+-- Append-only; no delete endpoint. redirect_id NULL for bulk actions.
+
+**Migration:** `db/migrations/0002_redirects.sql` (additive only; no changes to existing tables).
+**Manual rollback** (migration runner has no DOWN support):
+```sql
+DROP TABLE IF EXISTS redirect_audit;
+DROP TABLE IF EXISTS redirects;
+DELETE FROM schema_migrations WHERE name = '0002_redirects.sql';
+```
 
 -- OAuth provider tokens (encrypted)
 provider_tokens (id, provider ENUM('ga4','search_console'), encrypted_access_token, encrypted_refresh_token, token_expiry, property_id, connected_by, connected_at, last_refresh_at)
@@ -119,9 +179,12 @@ source_path,target_url,status_code,is_active
 /about/me,https://example.com/about,301,true
 /old-page,/new-page,302,false
 ```
-- Validation: source_path must start with `/`, must not match `/faisals-room/*` or `/api/*`; target_url must be valid URL or path; status_code in (301,302,307,308)
-- Duplicate source_path in file → row rejected with message "Row 5: duplicate source_path '/about/me'"
-- Invalid rows reported with row numbers; valid rows still imported
+- **Import request format:** JSON body `{ "csv": "<csv text>" }`, max 256KB (~2,000 rows). Not multipart.
+- Validation: source_path must start with `/`, must not match `/faisals-room/*` or `/api/*`; target_url must be a root-relative path or absolute `https://` URL; status_code in (301,302,307,308).
+- Duplicate source_path in file → row rejected with message "Row 5: duplicate source_path '/about/me'".
+- source_path already in database → row rejected with "Row 5: '/about/me' already exists — edit or delete it first". Never silently overwritten.
+- Invalid rows reported with row numbers; valid rows still imported (all-or-nothing per transaction; see Redirect Manager section).
+- CSV parsing handles: UTF-8 BOM (stripped), quoted fields with embedded commas/newlines, CRLF and LF line endings. Unclosed quotes or malformed rows are rejected with row numbers.
 
 ---
 
@@ -243,6 +306,9 @@ source_path,target_url,status_code,is_active
 - Accessibility: Table keyboard navigable; error messages announced
 - Responsive: Table → cards at mobile
 - Regression: Existing routes unaffected when redirects disabled
+- **Automated tests (unit, runnable without DB):** malformed CSV rows, UTF-8 BOM stripping, quoted fields with embedded commas/newlines, duplicate rows within file, self-redirect rejection, loop detection (2-node and 3-node cycles), chain depth exceeding 5 hops, URL normalization (trailing slashes, query strings, percent-encoding, case sensitivity preserved distinctly), protected-path rejection, invalid status codes
+- **Automated tests (integration, require test DB):** owner auth (401 anonymous), CSRF rejection (403 wrong origin), duplicate database entries rejected (409, no overwrite), concurrent duplicate creation (exactly one succeeds), audit revert validation (invalid revert fails atomically, rules unchanged), bulk disable creates accurate audit record and reverses safely, preview endpoint returns HTTP 200 JSON (never 3xx, no `Location` header)
+- **Guarantee test:** public routes never evaluate redirect rules — assert no middleware or route handler reads the `redirects` table outside dashboard APIs (static import-graph check + runtime assertion that public page responses contain no redirect behavior)
 
 **GA4 / Search Console:**
 - Functional: OAuth flow completes; real data displays; disconnect works
