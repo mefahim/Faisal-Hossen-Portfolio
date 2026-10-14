@@ -187,7 +187,8 @@ export function RedirectManagerClient({ initialRules }: { initialRules: Redirect
 
   return (
     <div>
-      <div className="room-alert room-alert-info" role="status" style={{ marginBottom: "1.5rem" }}>
+      <style>{`@media (max-width: 850px) { .redirect-manager-layout { grid-template-columns: 1fr !important; } }`}</style>
+      <div className="room-alert room-alert-info" role="status" style={{ marginBottom: "1.5rem", minWidth: 0, overflowWrap: "anywhere" }}>
         <strong>Planning only.</strong> Redirect rules are drafts. They do not affect public traffic — no middleware
         or public route evaluates these rules. Production activation requires a separate approved release.
         Rule states: <code>Draft</code> / <code>Validated</code> / <code>Ready</code>. Never <code>Active</code> in this phase.
@@ -203,7 +204,7 @@ export function RedirectManagerClient({ initialRules }: { initialRules: Redirect
         </div>
       ) : null}
 
-      <div className="room-editor-layout">
+      <div className="room-editor-layout redirect-manager-layout">
         <section className="room-editor-card" aria-label="Redirect rules">
           <h2 style={{ marginTop: 0 }}>Rules ({rules.length})</h2>
           {rules.length === 0 ? (
@@ -213,11 +214,11 @@ export function RedirectManagerClient({ initialRules }: { initialRules: Redirect
               {rules.map((r) => (
                 <article key={r.id} className="room-lead-card">
                   <div className="room-lead-head">
-                    <h3><code>{r.source_path}</code></h3>
+                    <h3><code style={{ overflowWrap: "anywhere" }}>{r.source_path}</code></h3>
                     <span className="room-status-pill">Draft</span>
                   </div>
                   <p className="room-lead-contact">
-                    → <code>{r.target_url}</code> · {r.status_code}
+                    → <code style={{ overflowWrap: "anywhere" }}>{r.target_url}</code> · {r.status_code}
                   </p>
                   <div className="room-lead-actions">
                     <button type="button" className="room-text-button" onClick={() => setEditing(r.source_path)}>Edit</button>
@@ -314,7 +315,7 @@ export function RedirectManagerClient({ initialRules }: { initialRules: Redirect
               {preview.would_redirect ? (
                 <p>Target: <code>{preview.target}</code> ({preview.status_code})</p>
               ) : null}
-              <p>Chain: <code>{preview.chain.join(" → ")}</code></p>
+              <p>Chain: <code style={{ overflowWrap: "anywhere" }}>{preview.chain.join(" → ")}</code></p>
             </div>
           ) : null}
 
