@@ -3,11 +3,11 @@
 import { useEffect, useState } from "react";
 
 /**
- * Phase 2 Feature 3 (Phase B Step 2, PR-A): Analytics dashboard.
+ * Phase 2 Feature 3 (Phase B+): Analytics dashboard.
  *
  * Honest states only. No mock data is presented as real analytics.
  * The Connect button initiates the real Google OAuth flow (PR-A).
- * Property selection and data display arrive in PR-B.
+ * Property selection arrived in PR-B; metrics display in Phase B+.
  */
 
 type ConnectionState = "not_connected" | "loading" | "error";
@@ -22,6 +22,30 @@ type GA4Property = {
   displayName: string;
   accountName: string;
 };
+
+type TopPage = {
+  pageTitle: string;
+  pagePath: string;
+  views: number;
+};
+
+type GA4Report = {
+  sessions: number;
+  totalUsers: number;
+  pageViews: number;
+  topPages: TopPage[];
+  dateRange: string;
+  fetchedAt: string;
+  cached: boolean;
+  stale: boolean;
+};
+
+type DateRangeKey = "7d" | "30d" | "90d";
+const DATE_RANGES: Array<{ key: DateRangeKey; label: string }> = [
+  { key: "7d", label: "Last 7 days" },
+  { key: "30d", label: "Last 30 days" },
+  { key: "90d", label: "Last 90 days" },
+];
 
 const OAUTH_MESSAGES: Record<string, { kind: "success" | "warning" | "error"; text: string }> = {
   connected: { kind: "success", text: "Google Analytics connected. Select a property to see data." },
@@ -146,6 +170,173 @@ export function AnalyticsDashboardClient({ initialState }: { initialState: Dashb
       <strong>Could not load analytics.</strong>{" "}
       {state.kind === "error" ? state.message : "An unexpected error occurred."}
     </div>
+  );
+}
+
+function formatNumber(n: number): string {
+  return n.toLocaleString("en-US");
+}
+
+function formatFetchedAt(iso: string): string {
+  try {
+    return new Date(iso).toLocaleString("en-US", {
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  } catch {
+    return iso;
+  }
+}
+
+/**
+ * Metrics display (Phase B+). Fetches real GA4 data via the reports API.
+ * Shows honest loading, empty, and error states — never fabricated numbers.
+ */
+function MetricsDisplay({ propertyId }: { propertyId: string }) {
+  const [dateRange, setDateRange] = useState<DateRangeKey>("30d");
+  const [report, setReport] = useState<GA4Report | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function loadReport(range: DateRangeKey, forceRefresh: boolean) {
+    if (forceRefresh) setRefreshing(true);
+    else setLoading(true);
+    setError(null);
+    try {
+      const params = new URLSearchParams({ dateRange: range });
+      if (forceRefresh) params.set("refresh", "1");
+      const response = await fetch(`/api/faisals-room/analytics/reports?${params.toString()}`);
+      const data = (await response.json()) as { report?: GA4Report; error?: string };
+      if (!response.ok) throw new Error(data.error ?? "Could not load analytics report.");
+      if (!data.report) throw new Error("Could not load analytics report.");
+      setReport(data.report);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not load analytics report.");
+      setReport(null);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }
+
+  useEffect(() => {
+    loadReport(dateRange, false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dateRange, propertyId]);
+
+  function handleRangeChange(e: React.ChangeEvent<HTMLSelectElement>) {
+    setDateRange(e.target.value as DateRangeKey);
+  }
+
+  const rangeLabel = DATE_RANGES.find((r) => r.key === dateRange)?.label ?? dateRange;
+
+  return (
+    <section className="room-card" style={{ marginTop: "1.5rem" }} aria-label="Analytics metrics">
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.75rem" }}>
+        <h2 style={{ margin: 0 }}>Traffic overview</h2>
+        <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+          <label htmlFor="ga4-range" className="room-editor-help" style={{ margin: 0 }}>
+            Range:
+          </label>
+          <select
+            id="ga4-range"
+            value={dateRange}
+            onChange={handleRangeChange}
+            className="room-input"
+            disabled={loading || refreshing}
+          >
+            {DATE_RANGES.map((r) => (
+              <option key={r.key} value={r.key}>
+                {r.label}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            className="room-button"
+            onClick={() => loadReport(dateRange, true)}
+            disabled={loading || refreshing}
+          >
+            {refreshing ? "Refreshing…" : "Refresh"}
+          </button>
+        </div>
+      </div>
+
+      {loading ? (
+        <div role="status" aria-label="Loading analytics" style={{ marginTop: "1rem" }}>
+          <div className="room-metric-grid">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="room-metric" aria-hidden="true">
+                <span>Loading…</span>
+                <strong>—</strong>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : error ? (
+        <div className="room-alert room-alert-error" role="alert" style={{ marginTop: "1rem" }}>
+          <strong>Could not load metrics.</strong> {error}
+        </div>
+      ) : report ? (
+        <div style={{ marginTop: "1rem" }}>
+          <div className="room-metric-grid">
+            <div className="room-metric">
+              <span>Sessions</span>
+              <strong>{formatNumber(report.sessions)}</strong>
+              <small>{rangeLabel}</small>
+            </div>
+            <div className="room-metric">
+              <span>Total users</span>
+              <strong>{formatNumber(report.totalUsers)}</strong>
+              <small>{rangeLabel}</small>
+            </div>
+            <div className="room-metric">
+              <span>Page views</span>
+              <strong>{formatNumber(report.pageViews)}</strong>
+              <small>{rangeLabel}</small>
+            </div>
+          </div>
+
+          <h3 style={{ marginTop: "1.5rem", marginBottom: "0.75rem" }}>Top pages</h3>
+          {report.topPages.length === 0 ? (
+            <p className="room-editor-help" role="status">
+              No page data for this period.
+            </p>
+          ) : (
+            <div style={{ overflowX: "auto" }}>
+              <table className="room-table" style={{ width: "100%" }}>
+                <thead>
+                  <tr>
+                    <th style={{ textAlign: "left" }}>Page</th>
+                    <th style={{ textAlign: "right" }}>Views</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {report.topPages.map((p, i) => (
+                    <tr key={`${p.pagePath}-${i}`}>
+                      <td>
+                        <div style={{ fontWeight: 500 }}>{p.pageTitle}</div>
+                        <div className="room-editor-help" style={{ margin: 0 }}>{p.pagePath}</div>
+                      </td>
+                      <td style={{ textAlign: "right" }}>{formatNumber(p.views)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          <p className="room-editor-help" style={{ marginTop: "1rem", marginBottom: 0 }}>
+            Fetched {formatFetchedAt(report.fetchedAt)}
+            {report.cached ? " (cached)" : " (live)"}
+            {report.stale && <strong> — data may be stale (older than 24h).</strong>}
+          </p>
+        </div>
+      ) : null}
+    </section>
   );
 }
 
@@ -283,6 +474,7 @@ function PropertyPicker({ initialPropertyId }: { initialPropertyId: string | nul
           </div>
         )}
       </section>
+      {selected && <MetricsDisplay propertyId={selected} />}
     </div>
   );
 }
