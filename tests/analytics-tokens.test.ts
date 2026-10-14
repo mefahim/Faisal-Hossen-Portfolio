@@ -4,6 +4,7 @@ import {
   assertSupportedProvider,
   normalizePropertyId,
   needsRefresh,
+  buildStoreTokensSql,
   TOKEN_REFRESH_BUFFER_MS,
   _setTokenExchange,
   _setTokenRefresh,
@@ -91,4 +92,31 @@ test("injectable token refresh mock works", async () => {
   });
   _setTokenRefresh(null);
   assert.equal(called, false); // mock registered then cleared without invocation
+});
+
+test("buildStoreTokensSql: initial connection sets connected_at and clears last_refresh_at", () => {
+  const sql = buildStoreTokensSql(false);
+  assert.match(sql, /connected_at=CURRENT_TIMESTAMP\(3\)/);
+  assert.match(sql, /last_refresh_at=NULL/);
+  // Must NOT preserve connected_at on initial (it sets it fresh)
+  assert.doesNotMatch(sql, /last_refresh_at=CURRENT_TIMESTAMP/);
+});
+
+test("buildStoreTokensSql: refresh preserves connected_at and sets last_refresh_at", () => {
+  const sql = buildStoreTokensSql(true);
+  // Must NOT touch connected_at on refresh (preserve original)
+  assert.doesNotMatch(sql, /connected_at=CURRENT_TIMESTAMP/);
+  assert.doesNotMatch(sql, /connected_at\s*=/);
+  // Must set last_refresh_at to now
+  assert.match(sql, /last_refresh_at=CURRENT_TIMESTAMP\(3\)/);
+});
+
+test("buildStoreTokensSql: both variants update token fields", () => {
+  for (const isRefresh of [true, false]) {
+    const sql = buildStoreTokensSql(isRefresh);
+    assert.match(sql, /encrypted_access_token=VALUES\(encrypted_access_token\)/);
+    assert.match(sql, /encrypted_refresh_token=VALUES\(encrypted_refresh_token\)/);
+    assert.match(sql, /token_expiry=VALUES\(token_expiry\)/);
+    assert.match(sql, /ON DUPLICATE KEY UPDATE/);
+  }
 });

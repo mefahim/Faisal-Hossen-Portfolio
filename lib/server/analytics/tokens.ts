@@ -80,11 +80,32 @@ function requireEncryption(): void {
   }
 }
 
+/** Pure function: build the upsert SQL for token storage. (testable without DB) */
+export function buildStoreTokensSql(isRefresh: boolean): string {
+  return (
+    `INSERT INTO provider_tokens(id, provider, encrypted_access_token, encrypted_refresh_token, token_expiry, property_id, connected_by)
+     VALUES($1,$2,$3,$4,$5,$6,$7)
+     ON DUPLICATE KEY UPDATE
+       encrypted_access_token=VALUES(encrypted_access_token),
+       encrypted_refresh_token=VALUES(encrypted_refresh_token),
+       token_expiry=VALUES(token_expiry),
+       property_id=VALUES(property_id),
+       connected_by=VALUES(connected_by)` +
+    (isRefresh
+      ? `,
+       last_refresh_at=CURRENT_TIMESTAMP(3)`
+      : `,
+       connected_at=CURRENT_TIMESTAMP(3),
+       last_refresh_at=NULL`)
+  );
+}
+
 export async function storeTokens(
   provider: string,
   tokens: TokenSet,
   actorId: string,
   propertyId?: string,
+  options?: { isRefresh?: boolean },
 ): Promise<void> {
   const session = await requireOwner();
   if (session.userId !== actorId) throw new UnauthorizedError();
@@ -92,22 +113,20 @@ export async function storeTokens(
   assertSupportedProvider(provider);
   const encAccess = encryptToken(tokens.accessToken);
   const encRefresh = encryptToken(tokens.refreshToken);
+  const isRefresh = options?.isRefresh === true;
   await transaction(async (client) => {
-    // Upsert: one row per provider. Old tokens are overwritten (they are
-    // revoked server-side on disconnect; on reconnect they are replaced).
-    await client.query(
-      `INSERT INTO provider_tokens(id, provider, encrypted_access_token, encrypted_refresh_token, token_expiry, property_id, connected_by)
-       VALUES($1,$2,$3,$4,$5,$6,$7)
-       ON DUPLICATE KEY UPDATE
-         encrypted_access_token=VALUES(encrypted_access_token),
-         encrypted_refresh_token=VALUES(encrypted_refresh_token),
-         token_expiry=VALUES(token_expiry),
-         property_id=VALUES(property_id),
-         connected_by=VALUES(connected_by),
-         connected_at=CURRENT_TIMESTAMP(3),
-         last_refresh_at=NULL`,
-      [randomUUID(), provider, encAccess, encRefresh, tokens.expiresAt, propertyId ?? null, actorId],
-    );
+    // Upsert: one row per provider.
+    // - Initial connection (isRefresh=false): set connected_at=now, last_refresh_at=NULL.
+    // - Token refresh (isRefresh=true): preserve original connected_at, set last_refresh_at=now.
+    await client.query(buildStoreTokensSql(isRefresh), [
+      randomUUID(),
+      provider,
+      encAccess,
+      encRefresh,
+      tokens.expiresAt,
+      propertyId ?? null,
+      actorId,
+    ]);
   });
 }
 
@@ -135,7 +154,7 @@ export async function getValidAccessToken(provider: string, actorId: string): Pr
     }
     const refreshToken = decryptToken(toString(row.encrypted_refresh_token));
     const fresh = await refreshImpl(refreshToken);
-    await storeTokens(provider, fresh, actorId);
+    await storeTokens(provider, fresh, actorId, undefined, { isRefresh: true });
     return fresh.accessToken;
   }
   return decryptToken(toString(row.encrypted_access_token));
