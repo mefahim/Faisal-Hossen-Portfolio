@@ -4,13 +4,16 @@ import {
   createOAuthChallenge,
   consumeOAuthState,
   verifyCodeChallenge,
+  generateChallengeParts,
   OAUTH_STATE_TTL_MS,
-  _injectState,
-  _stateStoreSize,
 } from "../lib/server/analytics/oauth-state";
+import { query, _closePool } from "../lib/server/db";
+import { generateTestEncryptionKey, isTestDatabaseAvailable, runMigrations } from "./db-test-utils";
 
-test("createOAuthChallenge returns state, verifier, and challenge", () => {
-  const c = createOAuthChallenge("ga4");
+// --- Pure crypto tests (no database required) ---
+
+test("generateChallengeParts returns state, verifier, and challenge", () => {
+  const c = generateChallengeParts();
   assert.ok(c.state.length >= 40);
   assert.ok(c.codeVerifier.length >= 40);
   assert.ok(c.codeChallenge.length >= 40);
@@ -18,39 +21,12 @@ test("createOAuthChallenge returns state, verifier, and challenge", () => {
 });
 
 test("verifier and challenge are consistent (S256)", () => {
-  const c = createOAuthChallenge("ga4");
+  const c = generateChallengeParts();
   assert.equal(verifyCodeChallenge(c.codeVerifier, c.codeChallenge), true);
 });
 
-test("consumeOAuthState returns verifier for valid state", () => {
-  const c = createOAuthChallenge("ga4");
-  const verifier = consumeOAuthState(c.state, "ga4");
-  assert.equal(verifier, c.codeVerifier);
-});
-
-test("state is single-use (replay rejected)", () => {
-  const c = createOAuthChallenge("ga4");
-  consumeOAuthState(c.state, "ga4");
-  assert.throws(() => consumeOAuthState(c.state, "ga4"), /Invalid or expired/);
-});
-
-test("unknown state is rejected", () => {
-  assert.throws(() => consumeOAuthState("nonexistent-state-token", "ga4"), /Invalid or expired/);
-});
-
-test("expired state is rejected", () => {
-  const state = "expired-test-state";
-  _injectState(state, "verifier", Date.now() - OAUTH_STATE_TTL_MS - 1000, "ga4");
-  assert.throws(() => consumeOAuthState(state, "ga4"), /expired/);
-});
-
-test("provider mismatch is rejected", () => {
-  const c = createOAuthChallenge("ga4");
-  assert.throws(() => consumeOAuthState(c.state, "search_console"), /mismatch/);
-});
-
 test("verifyCodeChallenge rejects wrong verifier", () => {
-  const c = createOAuthChallenge("ga4");
+  const c = generateChallengeParts();
   assert.equal(verifyCodeChallenge("wrong-verifier", c.codeChallenge), false);
 });
 
@@ -59,17 +35,100 @@ test("verifyCodeChallenge rejects empty inputs", () => {
   assert.equal(verifyCodeChallenge("abc", ""), false);
 });
 
-test("each challenge has unique state", () => {
-  const a = createOAuthChallenge("ga4");
-  const b = createOAuthChallenge("ga4");
+test("each challenge has unique state and verifier", () => {
+  const a = generateChallengeParts();
+  const b = generateChallengeParts();
   assert.notEqual(a.state, b.state);
   assert.notEqual(a.codeVerifier, b.codeVerifier);
 });
 
-test("expired states are cleaned from store", () => {
-  const before = _stateStoreSize();
-  _injectState("cleanup-test", "v", Date.now() - OAUTH_STATE_TTL_MS - 5000, "ga4");
-  // Consuming the expired entry removes it
-  assert.throws(() => consumeOAuthState("cleanup-test", "ga4"), /expired/);
-  assert.ok(_stateStoreSize() <= before);
+// --- Database integration tests (require DATABASE_URL) ---
+
+const dbAvailable = isTestDatabaseAvailable();
+
+test("DB setup: migrations and test encryption key", { skip: dbAvailable ? false : "DATABASE_URL not set" }, async () => {
+  process.env.OAUTH_ENCRYPTION_KEY = generateTestEncryptionKey();
+  await runMigrations(process.cwd());
+  // Clean any leftover state rows from previous runs.
+  await query("DELETE FROM oauth_states");
+});
+
+test("createOAuthChallenge persists state and consumeOAuthState returns verifier", { skip: !dbAvailable }, async () => {
+  const c = await createOAuthChallenge("ga4");
+  assert.ok(c.state.length >= 40);
+  // Verifier must be stored encrypted: raw DB value must not equal plaintext.
+  const rows = await query<{ encrypted_verifier: string }>("SELECT encrypted_verifier FROM oauth_states WHERE state=$1", [c.state]);
+  assert.equal(rows.rowCount, 1);
+  assert.notEqual(rows.rows[0].encrypted_verifier, c.codeVerifier);
+  assert.ok(!rows.rows[0].encrypted_verifier.includes(c.codeVerifier));
+
+  const verifier = await consumeOAuthState(c.state, "ga4");
+  assert.equal(verifier, c.codeVerifier);
+
+  // Consumed: row is gone.
+  const after = await query("SELECT state FROM oauth_states WHERE state=$1", [c.state]);
+  assert.equal(after.rowCount, 0);
+});
+
+test("state is single-use (replay rejected)", { skip: !dbAvailable }, async () => {
+  const c = await createOAuthChallenge("ga4");
+  await consumeOAuthState(c.state, "ga4");
+  await assert.rejects(() => consumeOAuthState(c.state, "ga4"), /Invalid or expired/);
+});
+
+test("unknown state is rejected", { skip: !dbAvailable }, async () => {
+  await assert.rejects(() => consumeOAuthState("nonexistent-state-token", "ga4"), /Invalid or expired/);
+});
+
+test("expired state is rejected and purged", { skip: !dbAvailable }, async () => {
+  const c = await createOAuthChallenge("ga4");
+  // Backdate the expiry directly.
+  await query("UPDATE oauth_states SET expires_at = DATE_SUB(CURRENT_TIMESTAMP(3), INTERVAL 1 MINUTE) WHERE state=$1", [c.state]);
+  await assert.rejects(() => consumeOAuthState(c.state, "ga4"), /expired/);
+  // Expired row must be deleted (single-use enforcement on failure paths).
+  const after = await query("SELECT state FROM oauth_states WHERE state=$1", [c.state]);
+  assert.equal(after.rowCount, 0);
+});
+
+test("provider mismatch is rejected and state is consumed", { skip: !dbAvailable }, async () => {
+  const c = await createOAuthChallenge("ga4");
+  await assert.rejects(() => consumeOAuthState(c.state, "search_console"), /mismatch/);
+  // Mismatched state is still single-use: gone after the failed attempt.
+  const after = await query("SELECT state FROM oauth_states WHERE state=$1", [c.state]);
+  assert.equal(after.rowCount, 0);
+});
+
+test("concurrent consumption: only one succeeds", { skip: !dbAvailable }, async () => {
+  const c = await createOAuthChallenge("ga4");
+  const attempts = await Promise.allSettled([
+    consumeOAuthState(c.state, "ga4"),
+    consumeOAuthState(c.state, "ga4"),
+    consumeOAuthState(c.state, "ga4"),
+  ]);
+  const succeeded = attempts.filter((r) => r.status === "fulfilled");
+  const failed = attempts.filter((r) => r.status === "rejected");
+  assert.equal(succeeded.length, 1, "exactly one concurrent consume must succeed");
+  assert.equal(failed.length, 2);
+  for (const f of failed) {
+    assert.match((f as PromiseRejectedResult).reason.message, /Invalid or expired/);
+  }
+});
+
+test("verifier is encrypted at rest with the configured key", { skip: !dbAvailable }, async () => {
+  const c = await createOAuthChallenge("ga4");
+  const rows = await query<{ encrypted_verifier: string | Buffer }>(
+    "SELECT encrypted_verifier FROM oauth_states WHERE state=$1",
+    [c.state],
+  );
+  const raw = typeof rows.rows[0].encrypted_verifier === "string"
+    ? rows.rows[0].encrypted_verifier
+    : (rows.rows[0].encrypted_verifier as Buffer).toString("utf8");
+  // AES-256-GCM wire format: base64(nonce).base64(ciphertext+tag)
+  assert.match(raw, /^[A-Za-z0-9+/=]+\.[A-Za-z0-9+/=]+$/);
+  await consumeOAuthState(c.state, "ga4"); // cleanup
+});
+
+test("DB teardown: clear oauth_states", { skip: !dbAvailable }, async () => {
+  await query("DELETE FROM oauth_states");
+  await _closePool();
 });

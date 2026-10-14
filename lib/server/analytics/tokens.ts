@@ -1,20 +1,23 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
 import { requireOwner, UnauthorizedError } from "../auth";
-import { transaction, query } from "../db";
-import { encryptToken, decryptToken, isEncryptionAvailable } from "./encryption";
+import { query, transaction, type DbClient } from "../db";
+import { decryptToken, encryptToken, isEncryptionAvailable } from "./encryption";
 
 /**
- * Phase 2 Feature 3 (Phase A): OAuth token lifecycle skeleton.
+ * Phase 2 Feature 3 (Phase B Step 1): OAuth token lifecycle.
  *
  * This module defines the token storage, retrieval, refresh, and disconnect
  * logic. Network calls to Google are abstracted behind injectable functions
- * so unit tests can mock them. Phase A does NOT make real Google API calls.
+ * so unit tests can mock them. This step does NOT make real Google API calls.
  *
  * Security:
  * - Tokens are encrypted with AES-256-GCM before storage.
- * - All functions require owner authentication.
+ * - All functions require owner authentication (except where noted).
  * - Token refresh is automatic when expiry is within 5 minutes.
+ * - Concurrent refreshes are coordinated with a database-backed lock
+ *   (MySQL GET_LOCK), so two requests cannot independently refresh the same
+ *   provider token.
  * - Disconnect deletes all token material (no soft-delete for secrets).
  */
 
@@ -60,9 +63,11 @@ export type StoredTokenInfo = {
 // Injectable network layer (mocked in tests; real implementation in Phase B).
 export type TokenExchangeFn = (code: string, codeVerifier: string, redirectUri: string) => Promise<TokenSet>;
 export type TokenRefreshFn = (refreshToken: string) => Promise<TokenSet>;
+export type TokenRevokerFn = (refreshToken: string) => Promise<void>;
 
 let exchangeImpl: TokenExchangeFn | null = null;
 let refreshImpl: TokenRefreshFn | null = null;
+let revokerImpl: TokenRevokerFn | null = null;
 
 /** Phase B will register the real Google token exchange implementation. */
 export function _setTokenExchange(fn: TokenExchangeFn | null): void {
@@ -74,10 +79,117 @@ export function _setTokenRefresh(fn: TokenRefreshFn | null): void {
   refreshImpl = fn;
 }
 
+/** Phase B will register the real Google token revocation implementation. */
+export function _setTokenRevoker(fn: TokenRevokerFn | null): void {
+  revokerImpl = fn;
+}
+
+/**
+ * Revoke a refresh token at Google. Server-side only; never called from the
+ * browser. Phase B wires this into disconnectProvider via _setTokenRevoker.
+ * Throws on network failure or non-OK response; callers treat revocation as
+ * best-effort (local deletion always proceeds).
+ */
+export async function revokeGoogleToken(refreshToken: string): Promise<void> {
+  const response = await fetch("https://oauth2.googleapis.com/revoke", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ token: refreshToken }),
+    signal: AbortSignal.timeout(10_000),
+  });
+  if (!response.ok) {
+    throw new Error(`Token revocation failed with status ${response.status}.`);
+  }
+}
+
 function requireEncryption(): void {
   if (!isEncryptionAvailable()) {
     throw new Error("Token encryption is not configured. Provider integrations are disabled.");
   }
+}
+
+/**
+ * Test seam: override owner session resolution for integration tests.
+ * When set, analytics functions use this instead of requireOwner().
+ * NEVER set in production code; tests must clear it after use.
+ */
+type SessionOverride = { userId: string } | null | "use-requireOwner";
+let sessionOverride: SessionOverride = "use-requireOwner";
+
+/** Test-only: force a specific owner session (or null for unauthenticated). */
+export function _setSessionOverride(session: { userId: string } | null): void {
+  sessionOverride = session;
+}
+
+/** Test-only: restore normal requireOwner() behavior. */
+export function _clearSessionOverride(): void {
+  sessionOverride = "use-requireOwner";
+}
+
+async function resolveSession(): Promise<{ userId: string }> {
+  if (sessionOverride !== "use-requireOwner") {
+    if (!sessionOverride) throw new UnauthorizedError();
+    return sessionOverride;
+  }
+  return requireOwner();
+}
+
+/**
+ * H1: cross-process mutex for token refresh.
+ *
+ * Uses MySQL GET_LOCK(), which is connection-scoped. Callers MUST invoke
+ * acquire/release on the same connection — in practice, inside a single
+ * transaction() callback. The lock is always released in a finally block;
+ * relying on connection close is unsafe because pooled connections are reused.
+ *
+ * Database assumptions (documented):
+ * - MySQL 5.7+ / MariaDB 10+: GET_LOCK(name, timeout) returns 1 on success,
+ *   0 on timeout, NULL on error.
+ * - Lock names are namespaced to avoid collisions with other applications
+ *   sharing the database server.
+ * - The refresh network call happens while holding the lock; the registered
+ *   refresh implementation must have its own timeout (Phase B uses fetch
+ *   with AbortSignal.timeout).
+ */
+export const REFRESH_LOCK_TIMEOUT_S = 10;
+
+export function refreshLockName(provider: string): string {
+  return `faisals_room:analytics:refresh:${provider}`;
+}
+
+async function acquireRefreshLock(client: DbClient, provider: string): Promise<boolean> {
+  const result = await client.query<{ acquired: number | null }>("SELECT GET_LOCK($1, $2) AS acquired", [
+    refreshLockName(provider),
+    REFRESH_LOCK_TIMEOUT_S,
+  ]);
+  return result.rows[0]?.acquired === 1;
+}
+
+async function releaseRefreshLock(client: DbClient, provider: string): Promise<void> {
+  await client.query("SELECT RELEASE_LOCK($1)", [refreshLockName(provider)]).catch(() => undefined);
+}
+
+type PersistTokensInput = {
+  provider: string;
+  encryptedAccess: string;
+  encryptedRefresh: string;
+  expiresAt: Date;
+  propertyId: string | null;
+  actorId: string;
+  isRefresh: boolean;
+};
+
+/** Low-level token persistence on an existing client (used inside transactions). */
+async function persistTokens(client: DbClient, input: PersistTokensInput): Promise<void> {
+  await client.query(buildStoreTokensSql(input.isRefresh), [
+    randomUUID(),
+    input.provider,
+    input.encryptedAccess,
+    input.encryptedRefresh,
+    input.expiresAt,
+    input.propertyId,
+    input.actorId,
+  ]);
 }
 
 /** Pure function: build the upsert SQL for token storage. (testable without DB) */
@@ -107,7 +219,7 @@ export async function storeTokens(
   propertyId?: string,
   options?: { isRefresh?: boolean },
 ): Promise<void> {
-  const session = await requireOwner();
+  const session = await resolveSession();
   if (session.userId !== actorId) throw new UnauthorizedError();
   requireEncryption();
   assertSupportedProvider(provider);
@@ -118,51 +230,99 @@ export async function storeTokens(
     // Upsert: one row per provider.
     // - Initial connection (isRefresh=false): set connected_at=now, last_refresh_at=NULL.
     // - Token refresh (isRefresh=true): preserve original connected_at, set last_refresh_at=now.
-    await client.query(buildStoreTokensSql(isRefresh), [
-      randomUUID(),
+    await persistTokens(client, {
       provider,
-      encAccess,
-      encRefresh,
-      tokens.expiresAt,
-      propertyId ?? null,
+      encryptedAccess: encAccess,
+      encryptedRefresh: encRefresh,
+      expiresAt: tokens.expiresAt,
+      propertyId: propertyId ?? null,
       actorId,
-    ]);
+      isRefresh,
+    });
   });
+}
+
+type TokenRow = {
+  encrypted_access_token: string | Buffer;
+  encrypted_refresh_token: string | Buffer;
+  token_expiry: Date;
+  property_id: string | null;
+};
+
+function tokenToString(v: string | Buffer): string {
+  return typeof v === "string" ? v : v.toString("utf8");
 }
 
 /**
  * Get a valid access token, refreshing if near expiry.
  * Returns the DECRYPTED access token — caller must never expose it.
+ *
+ * H1: refresh is coordinated with a database-backed lock. The fast path
+ * (token still valid) takes no lock. When a refresh is needed:
+ *  1. Acquire the provider refresh lock (GET_LOCK, cross-process).
+ *  2. Re-read the token row — another request may have refreshed it already.
+ *  3. Only refresh if still needed; store the new tokens while holding the lock.
+ * This prevents double refresh even with concurrent requests across app instances.
  */
 export async function getValidAccessToken(provider: string, actorId: string): Promise<string> {
-  const session = await requireOwner();
+  const session = await resolveSession();
   if (session.userId !== actorId) throw new UnauthorizedError();
   requireEncryption();
+  assertSupportedProvider(provider);
   const row = (
-    await query<{
-      encrypted_access_token: string | Buffer;
-      encrypted_refresh_token: string | Buffer;
-      token_expiry: Date;
-    }>("SELECT encrypted_access_token, encrypted_refresh_token, token_expiry FROM provider_tokens WHERE provider=$1", [provider])
+    await query<TokenRow>(
+      "SELECT encrypted_access_token, encrypted_refresh_token, token_expiry, property_id FROM provider_tokens WHERE provider=$1",
+      [provider],
+    )
   ).rows[0];
   if (!row) throw new Error(`Provider '${provider}' is not connected.`);
-  const toString = (v: string | Buffer): string => (typeof v === "string" ? v : v.toString("utf8"));
-  // Refresh if expiring within buffer window.
-  if (needsRefresh(row.token_expiry)) {
-    if (!refreshImpl) {
-      throw new Error("Token refresh is not implemented in Phase A. Reconnect the provider.");
-    }
-    const refreshToken = decryptToken(toString(row.encrypted_refresh_token));
-    const fresh = await refreshImpl(refreshToken);
-    await storeTokens(provider, fresh, actorId, undefined, { isRefresh: true });
-    return fresh.accessToken;
+  // Fast path: token still valid, no coordination needed.
+  if (!needsRefresh(row.token_expiry)) {
+    return decryptToken(tokenToString(row.encrypted_access_token));
   }
-  return decryptToken(toString(row.encrypted_access_token));
+  // Slow path: coordinated refresh under a cross-process lock.
+  return transaction(async (client) => {
+    const locked = await acquireRefreshLock(client, provider);
+    if (!locked) {
+      throw new Error("Could not acquire token refresh lock. Please retry.");
+    }
+    try {
+      // Re-read after acquiring the lock: another request may have refreshed already.
+      const current = (
+        await client.query<TokenRow>(
+          "SELECT encrypted_access_token, encrypted_refresh_token, token_expiry, property_id FROM provider_tokens WHERE provider=$1",
+          [provider],
+        )
+      ).rows[0];
+      if (!current) throw new Error(`Provider '${provider}' is not connected.`);
+      if (!needsRefresh(current.token_expiry)) {
+        return decryptToken(tokenToString(current.encrypted_access_token));
+      }
+      if (!refreshImpl) {
+        throw new Error("Token refresh is not implemented. Reconnect the provider.");
+      }
+      const refreshToken = decryptToken(tokenToString(current.encrypted_refresh_token));
+      const fresh = await refreshImpl(refreshToken);
+      await persistTokens(client, {
+        provider,
+        encryptedAccess: encryptToken(fresh.accessToken),
+        encryptedRefresh: encryptToken(fresh.refreshToken),
+        expiresAt: fresh.expiresAt,
+        propertyId: current.property_id,
+        actorId,
+        isRefresh: true,
+      });
+      return fresh.accessToken;
+    } finally {
+      await releaseRefreshLock(client, provider);
+    }
+  });
 }
 
-export async function getConnectionStatus(provider: string): Promise<StoredTokenInfo | null> {
-  const session = await requireOwner();
-  void session;
+export async function getConnectionStatus(provider: string, actorId: string): Promise<StoredTokenInfo | null> {
+  const session = await resolveSession();
+  if (session.userId !== actorId) throw new UnauthorizedError();
+  assertSupportedProvider(provider);
   const row = (
     await query<{
       provider: string;
@@ -182,8 +342,31 @@ export async function getConnectionStatus(provider: string): Promise<StoredToken
 }
 
 export async function disconnectProvider(provider: string, actorId: string): Promise<void> {
-  const session = await requireOwner();
+  const session = await resolveSession();
   if (session.userId !== actorId) throw new UnauthorizedError();
+  assertSupportedProvider(provider);
+  requireEncryption();
+
+  // L1: best-effort server-side revocation BEFORE local deletion.
+  // Revocation failure must never skip local deletion; no token material is logged.
+  if (revokerImpl) {
+    const existing = (
+      await query<{ encrypted_refresh_token: string | Buffer }>(
+        "SELECT encrypted_refresh_token FROM provider_tokens WHERE provider=$1",
+        [provider],
+      )
+    ).rows[0];
+    if (existing) {
+      try {
+        const refreshToken = decryptToken(tokenToString(existing.encrypted_refresh_token));
+        await revokerImpl(refreshToken);
+      } catch {
+        // Best-effort only: local deletion proceeds regardless.
+        // Intentionally no details logged (must never leak token material).
+      }
+    }
+  }
+
   // Hard delete: no soft-delete for secrets. Cache entries are also purged.
   await transaction(async (client) => {
     await client.query("DELETE FROM provider_tokens WHERE provider=$1", [provider]);
@@ -192,7 +375,7 @@ export async function disconnectProvider(provider: string, actorId: string): Pro
 }
 
 export async function setPropertyId(provider: string, propertyId: string, actorId: string): Promise<void> {
-  const session = await requireOwner();
+  const session = await resolveSession();
   if (session.userId !== actorId) throw new UnauthorizedError();
   const normalized = normalizePropertyId(propertyId);
   const result = await query("UPDATE provider_tokens SET property_id=$1 WHERE provider=$2", [normalized, provider]);

@@ -46,6 +46,18 @@ export function getPool(): Pool {
   return root.__faisalsRoomPool;
 }
 
+/**
+ * Test-only: close the pool so test processes can exit cleanly.
+ * Never call in production request handling.
+ */
+export async function _closePool(): Promise<void> {
+  const root = globalThis as GlobalPool;
+  if (root.__faisalsRoomPool) {
+    await root.__faisalsRoomPool.end();
+    delete root.__faisalsRoomPool;
+  }
+}
+
 export function query<T extends QueryResultRow = QueryResultRow>(sql: string, values: readonly unknown[] = []): Promise<QueryResult<T>> {
   return makeClient(getPool()).query<T>(sql, values);
 }

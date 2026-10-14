@@ -22,7 +22,7 @@ export default async function AnalyticsPage() {
   // (migration not applied), treat as not connected.
   let connected = false;
   try {
-    const status = await getConnectionStatus("ga4");
+    const status = await getConnectionStatus("ga4", owner.userId);
     connected = status !== null;
   } catch {
     connected = false;
