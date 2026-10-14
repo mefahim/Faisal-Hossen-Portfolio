@@ -373,12 +373,13 @@ export async function disconnectProvider(provider: string, actorId: string): Pro
   const session = await resolveSession();
   if (session.userId !== actorId) throw new UnauthorizedError();
   assertSupportedProvider(provider);
-  requireEncryption();
 
   // L1: best-effort server-side revocation BEFORE local deletion.
+  // Revocation needs the encryption key (to decrypt the refresh token); if the
+  // key is missing, revocation is skipped but local deletion still proceeds.
   // Revocation failure must never skip local deletion; no token material is logged.
   const revoker = _resolveRevoker();
-  if (revoker) {
+  if (revoker && isEncryptionAvailable()) {
     const existing = (
       await query<{ encrypted_refresh_token: string | Buffer }>(
         "SELECT encrypted_refresh_token FROM provider_tokens WHERE provider=$1",

@@ -198,6 +198,20 @@ test("disconnect proceeds with local deletion when revocation fails (L1)", skipN
   _setTokenRevoker(null);
 });
 
+test("disconnect works without encryption key (local deletion not blocked)", skipNoDb, async () => {
+  await storeTokens("ga4", { accessToken: "ak", refreshToken: "rk", expiresAt: futureExpiry(60) }, ACTOR);
+  // Simulate lost/misconfigured key: revocation must be skipped, deletion proceeds.
+  const savedKey = process.env.OAUTH_ENCRYPTION_KEY;
+  delete process.env.OAUTH_ENCRYPTION_KEY;
+  try {
+    await disconnectProvider("ga4", ACTOR);
+  } finally {
+    process.env.OAUTH_ENCRYPTION_KEY = savedKey;
+  }
+  const tokens = await query("SELECT provider FROM provider_tokens WHERE provider=$1", ["ga4"]);
+  assert.equal(tokens.rowCount, 0, "local deletion must proceed without encryption key");
+});
+
 test("transaction rollback restores state on failure", skipNoDb, async () => {
   await assert.rejects(
     () =>
