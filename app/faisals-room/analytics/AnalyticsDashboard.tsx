@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 /**
  * Phase 2 Feature 3 (Phase B Step 2, PR-A): Analytics dashboard.
@@ -156,6 +156,13 @@ function PropertyPicker({ initialPropertyId }: { initialPropertyId: string | nul
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+
+  // Auto-load properties on mount so a saved selection is visible
+  // immediately after page reload without requiring a manual click.
+  useEffect(() => {
+    loadProperties();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function loadProperties() {
     setLoading(true);
