@@ -77,6 +77,28 @@ function parseIntSafe(value: string | undefined): number {
   return Number.isFinite(n) && n >= 0 ? n : 0;
 }
 
+/**
+ * Extract the three overview totals (sessions, totalUsers, screenPageViews)
+ * from a dimension-less runReport response.
+ *
+ * The Data API only populates `totals[]` when `metricAggregations` is
+ * requested; otherwise the values arrive in `rows[0].metricValues`.
+ * Exported for tests.
+ */
+export function extractTotals(res: RunReportResponse): {
+  sessions: number;
+  totalUsers: number;
+  pageViews: number;
+} {
+  const values =
+    res.totals?.[0]?.metricValues ?? res.rows?.[0]?.metricValues ?? [];
+  return {
+    sessions: parseIntSafe(values[0]?.value),
+    totalUsers: parseIntSafe(values[1]?.value),
+    pageViews: parseIntSafe(values[2]?.value),
+  };
+}
+
 async function callRunReport(
   accessToken: string,
   propertyId: string,
@@ -198,14 +220,14 @@ export async function getOverviewReport(
   const startDate = dateRangeToStartDate(dateRange);
 
   // Totals: sessions, totalUsers, screenPageViews.
+  // Note: the Data API only populates `totals[]` when `metricAggregations`
+  // is requested. For a dimension-less report the values come back in
+  // `rows[0].metricValues`, so fall back to that when `totals` is empty.
   const totalsRes = await callRunReport(accessToken, propertyId, {
     dateRanges: [{ startDate, endDate: "today" }],
     metrics: [{ name: "sessions" }, { name: "totalUsers" }, { name: "screenPageViews" }],
   });
-  const totals = totalsRes.totals?.[0]?.metricValues ?? [];
-  const sessions = parseIntSafe(totals[0]?.value);
-  const totalUsers = parseIntSafe(totals[1]?.value);
-  const pageViews = parseIntSafe(totals[2]?.value);
+  const { sessions, totalUsers, pageViews } = extractTotals(totalsRes);
 
   // Top pages: pageTitle + pagePath dimensions, ordered by views desc, top 10.
   const pagesRes = await callRunReport(accessToken, propertyId, {

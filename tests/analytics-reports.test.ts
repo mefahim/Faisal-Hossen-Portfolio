@@ -50,3 +50,39 @@ test("cache key components are documented", () => {
   const keyParts = ["provider", "property_id", "date_range", "report_type"];
   assert.deepEqual(keyParts, ["provider", "property_id", "date_range", "report_type"]);
 });
+
+// --- extractTotals: dimension-less report parsing (regression for the
+// production bug where totals showed 0 while top pages had real data) ---
+
+test("extractTotals reads values from rows when totals is absent", async () => {
+  const { extractTotals } = await import("../lib/server/analytics/ga4-reports");
+  // Real-world shape: dimension-less report without metricAggregations.
+  const res = {
+    rowCount: 1,
+    rows: [{ metricValues: [{ value: "12" }, { value: "9" }, { value: "22" }] }],
+  };
+  assert.deepEqual(extractTotals(res), { sessions: 12, totalUsers: 9, pageViews: 22 });
+});
+
+test("extractTotals prefers totals[] when present", async () => {
+  const { extractTotals } = await import("../lib/server/analytics/ga4-reports");
+  const res = {
+    totals: [{ metricValues: [{ value: "5" }, { value: "4" }, { value: "10" }] }],
+    rows: [{ metricValues: [{ value: "99" }, { value: "99" }, { value: "99" }] }],
+  };
+  assert.deepEqual(extractTotals(res), { sessions: 5, totalUsers: 4, pageViews: 10 });
+});
+
+test("extractTotals returns zeros for empty responses", async () => {
+  const { extractTotals } = await import("../lib/server/analytics/ga4-reports");
+  assert.deepEqual(extractTotals({}), { sessions: 0, totalUsers: 0, pageViews: 0 });
+  assert.deepEqual(extractTotals({ rows: [] }), { sessions: 0, totalUsers: 0, pageViews: 0 });
+});
+
+test("extractTotals sanitizes malformed values", async () => {
+  const { extractTotals } = await import("../lib/server/analytics/ga4-reports");
+  const res = {
+    rows: [{ metricValues: [{ value: "-3" }, { value: "abc" }, {}] }],
+  };
+  assert.deepEqual(extractTotals(res), { sessions: 0, totalUsers: 0, pageViews: 0 });
+});
