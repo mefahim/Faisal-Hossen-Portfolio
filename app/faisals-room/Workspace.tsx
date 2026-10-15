@@ -67,19 +67,33 @@ async function Overview() {
 
 async function SystemReadiness() {
   let database = "Not configured"; let migration = "Unavailable";
+  let ga4Status = "Not connected"; let gscStatus = "Not connected";
+  let healthAuditStatus = "Not available";
   try {
     const config = getConfig();
     if (config.DATABASE_URL) {
       database = "Configured";
       const result = await query<{ count: string }>("SELECT count(*) AS count FROM schema_migrations");
       migration = `${result.rows[0]?.count ?? "0"} migration(s) applied`;
+      // Live provider status — never expose tokens, only connection state.
+      const providers = await query<{ provider: string }>(
+        "SELECT provider FROM provider_tokens WHERE provider IN ('ga4','search_console')"
+      );
+      const connected = new Set(providers.rows.map((r) => r.provider));
+      if (connected.has("ga4")) ga4Status = "Connected";
+      if (connected.has("search_console")) gscStatus = "Connected";
+      // Health audit engine is available when its tables exist.
+      try {
+        await query("SELECT 1 FROM health_audits LIMIT 1");
+        healthAuditStatus = "Available — on-demand";
+      } catch { /* table missing: stays "Not available" */ }
     }
   } catch { database = "Connection unavailable"; }
   const cfg = getConfig();
   const rows = [
     ["Database connection", database], ["Schema", migration], ["Public content read source", cfg.CONTENT_SOURCE],
     ["Private media storage path", "Configured (path withheld)"], ["Owner authentication", "Argon2id + opaque expiring sessions"],
-    ["GA4 / Search Console", "Not connected — Phase 2"], ["Automated health audit / backups", "Deferred — Phase 3"],
+    ["GA4", ga4Status], ["Search Console", gscStatus], ["Website health audit", healthAuditStatus],
   ];
   return <section className="room-card"><p className="room-eyebrow">Foundation readiness</p><h2>Configuration at a glance</h2><p>Values below are status-only; database URLs, passwords, and provider secrets are never displayed.</p><dl className="room-status-list">{rows.map(([label,value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl><div className="room-alert room-alert-info"><LockKeyhole size={16} /> Set configuration through the deployment secret store. Bootstrap owner credentials must be removed immediately after one-time setup.</div></section>;
 }
