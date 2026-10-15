@@ -1,8 +1,11 @@
 # Deployment Note — Website Health Audit Engine (Phase 2)
 
 **Branch:** `feat/website-health-audit`
-**Commit:** `233f6b1`
-**ZIP:** `faisalhossen-health-audit.zip` (9.8 MB, SHA-256 `83d9662838d6794d…`)
+**Commit:** `645970e` (fix: replace dns.lookup monkey-patch with http.request lookup option)
+**ZIP:** `faisalhossen-health-audit.zip` (9.8 MB, SHA-256 `283e6e4b4efcbfe4…`) — **rebuilt after the fetch fix, deploy this one**
+
+### Fix for "Could not fetch the target URL" (2026-10-15)
+Root cause: global `dns.lookup` monkey-patching is unreliable — silently ignored under ESM module namespaces, and crashes on the 2-arg `(hostname, callback)` overload under CJS. `pinnedRequest()` now passes a custom `lookup` function directly to `http.request`/`https.request` options. No global patching; TLS SNI + Host header still use the real hostname. Also prefers IPv4 and adds safe failure codes for server-side diagnosis.
 
 ---
 
