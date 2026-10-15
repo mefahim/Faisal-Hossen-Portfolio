@@ -1,5 +1,7 @@
 import "server-only";
 import dns from "node:dns";
+import http from "node:http";
+import https from "node:https";
 import net from "node:net";
 
 /**
@@ -28,9 +30,12 @@ export const MAX_REDIRECTS = 5;
 const ALLOWED_PORTS = new Set([80, 443]);
 
 export class SafeFetchError extends Error {
-  constructor(message: string) {
+  /** Safe machine-readable failure reason (no IPs/hostnames). For server logs. */
+  readonly code: "url" | "dns" | "blocked" | "connect" | "timeout" | "redirect" | "limit";
+  constructor(message: string, code: SafeFetchError["code"] = "connect") {
     super(message);
     this.name = "SafeFetchError";
+    this.code = code;
   }
 }
 
@@ -115,38 +120,38 @@ export function isPublicIp(ip: string): boolean {
 export function validateTargetUrl(raw: string): URL {
   const trimmed = raw.trim();
   if (!trimmed || trimmed.length > 2048) {
-    throw new SafeFetchError("Invalid URL.");
+    throw new SafeFetchError("Invalid URL.", "url");
   }
   let url: URL;
   try {
     url = new URL(trimmed);
   } catch {
-    throw new SafeFetchError("Invalid URL.");
+    throw new SafeFetchError("Invalid URL.", "url");
   }
   if (url.protocol !== "http:" && url.protocol !== "https:") {
-    throw new SafeFetchError("Only HTTP and HTTPS URLs are allowed.");
+    throw new SafeFetchError("Only HTTP and HTTPS URLs are allowed.", "url");
   }
   if (url.username || url.password) {
-    throw new SafeFetchError("URLs with credentials are not allowed.");
+    throw new SafeFetchError("URLs with credentials are not allowed.", "url");
   }
   const port = url.port ? parseInt(url.port, 10) : url.protocol === "https:" ? 443 : 80;
   if (!ALLOWED_PORTS.has(port)) {
-    throw new SafeFetchError("Only ports 80 and 443 are allowed.");
+    throw new SafeFetchError("Only ports 80 and 443 are allowed.", "url");
   }
   return url;
 }
 
-/** Resolve a hostname and return validated public IPs. Throws on failure. */
+/** Resolve a hostname and return validated public IPs, IPv4 preferred. */
 async function resolvePublicIps(hostname: string): Promise<string[]> {
   // Reject literal IPs that aren't public before DNS.
   if (net.isIP(hostname)) {
-    if (!isPublicIp(hostname)) throw new SafeFetchError("Target address is not allowed.");
+    if (!isPublicIp(hostname)) throw new SafeFetchError("Target address is not allowed.", "blocked");
     return [hostname];
   }
   // Block obvious local hostnames without DNS.
   const lower = hostname.toLowerCase();
   if (lower === "localhost" || lower.endsWith(".localhost") || lower.endsWith(".internal") || lower.endsWith(".local")) {
-    throw new SafeFetchError("Target hostname is not allowed.");
+    throw new SafeFetchError("Target hostname is not allowed.", "blocked");
   }
   let records: string[];
   try {
@@ -154,12 +159,113 @@ async function resolvePublicIps(hostname: string): Promise<string[]> {
   } catch {
     throw new SafeFetchError("Could not resolve the target hostname.");
   }
-  if (records.length === 0) throw new SafeFetchError("Could not resolve the target hostname.");
+  if (records.length === 0) throw new SafeFetchError("Could not resolve the target hostname.", "dns");
   const publicIps = records.filter(isPublicIp);
   if (publicIps.length === 0) {
-    throw new SafeFetchError("Target hostname resolves to a non-public address.");
+    throw new SafeFetchError("Target hostname resolves to a non-public address.", "blocked");
   }
+  // Prefer IPv4: some hosts lack outbound IPv6 connectivity.
+  publicIps.sort((a, b) => (net.isIPv4(a) ? 0 : 1) - (net.isIPv4(b) ? 0 : 1));
   return publicIps;
+}
+
+/**
+ * HTTP(S) request with pinned DNS: the hostname always resolves to the
+ * validated IP via a custom lookup function passed to http.request.
+ * (Global dns.lookup monkey-patching is unreliable across module systems
+ * and unsafe with concurrent callers, so it is not used.) TLS SNI and the
+ * Host header still use the real hostname, so certificates validate normally.
+ */
+type PinnedResponse = {
+  status: number;
+  headers: Record<string, string>;
+  body: string;
+  truncated: boolean;
+};
+
+function pinnedRequest(url: URL, ip: string): Promise<PinnedResponse> {
+  return new Promise((resolve, reject) => {
+    const lib = url.protocol === "https:" ? https : http;
+    const family = net.isIPv6(ip) ? 6 : 4;
+    // Custom lookup: lenient about the (hostname, options, callback) vs
+    // (hostname, callback) forms — net internals vary by Node version.
+    const customLookup = (...args: unknown[]): void => {
+      const cb = args[args.length - 1] as (
+        err: NodeJS.ErrnoException | null,
+        address?: string | dns.LookupAddress[],
+        family?: number,
+      ) => void;
+      const opts = (args.length >= 3 ? args[1] : {}) as dns.LookupOptions;
+      if (typeof cb !== "function") return;
+      if (opts && typeof opts === "object" && opts.all) {
+        cb(null, [{ address: ip, family }]);
+      } else {
+        cb(null, ip, family);
+      }
+    };
+    let settled = false;
+    const fail = (err: Error): void => {
+      if (settled) return;
+      settled = true;
+      reject(err);
+    };
+    const req = lib.request(
+      url,
+      {
+        method: "GET",
+        headers: {
+          "User-Agent": "FaisalsRoom-HealthAudit/1.0 (+https://faisalhossen.com)",
+          Accept: "text/html,application/xhtml+xml,text/plain",
+        },
+        lookup: customLookup as unknown as typeof dns.lookup,
+        timeout: FETCH_TIMEOUT_MS,
+      },
+      (res) => {
+        const headers: Record<string, string> = {};
+        for (const [k, v] of Object.entries(res.headers)) {
+          if (typeof v === "string") headers[k.toLowerCase()] = v;
+          else if (Array.isArray(v)) headers[k.toLowerCase()] = v.join("; ");
+        }
+        const chunks: Buffer[] = [];
+        let bytes = 0;
+        res.on("data", (chunk: Buffer) => {
+          if (settled) return;
+          bytes += chunk.byteLength;
+          if (bytes > MAX_RESPONSE_BYTES) {
+            settled = true;
+            res.destroy();
+            resolve({
+              status: res.statusCode ?? 0,
+              headers,
+              body: Buffer.concat(chunks).toString("utf-8"),
+              truncated: true,
+            });
+            return;
+          }
+          chunks.push(chunk);
+        });
+        res.on("end", () => {
+          if (settled) return;
+          settled = true;
+          resolve({
+            status: res.statusCode ?? 0,
+            headers,
+            body: Buffer.concat(chunks).toString("utf-8"),
+            truncated: false,
+          });
+        });
+        res.on("error", fail);
+      },
+    );
+    req.on("timeout", () => {
+      req.destroy();
+      fail(new SafeFetchError("The target took too long to respond.", "timeout"));
+    });
+    req.on("error", (err) => {
+      fail(err instanceof SafeFetchError ? err : new SafeFetchError("Could not fetch the target URL.", "connect"));
+    });
+    req.end();
+  });
 }
 
 export type SafeFetchResult = {
@@ -183,96 +289,41 @@ export async function safeFetch(rawUrl: string): Promise<SafeFetchResult> {
     const ips = await resolvePublicIps(current.hostname);
     const pinnedIp = ips[0];
 
-    // DNS pinning: force this hostname to the validated IP during fetch.
-    const originalLookup = dns.lookup;
-    const pinnedLookup = (
-      hostname: string,
-      options: dns.LookupOptions,
-      callback: (err: NodeJS.ErrnoException | null, address: string | dns.LookupAddress[], family: number) => void,
-    ) => {
-      if (hostname === current.hostname) {
-        const family = net.isIPv6(pinnedIp) ? 6 : 4;
-        callback(null, pinnedIp, family);
-        return;
-      }
-      return (originalLookup as typeof dns.lookup)(hostname, options, callback);
-    };
-
-    let response: Response;
+    let response: PinnedResponse;
     try {
-      (dns as { lookup: typeof dns.lookup }).lookup = pinnedLookup as typeof dns.lookup;
-      response = await fetch(current.toString(), {
-        method: "GET",
-        redirect: "manual",
-        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-        headers: {
-          "User-Agent": "FaisalsRoom-HealthAudit/1.0 (+https://faisalhossen.com)",
-          Accept: "text/html,application/xhtml+xml,text/plain",
-        },
-      });
+      response = await pinnedRequest(current, pinnedIp);
     } catch (err) {
-      throw new SafeFetchError(
-        err instanceof Error && err.name === "TimeoutError"
-          ? "The target took too long to respond."
-          : "Could not fetch the target URL.",
-      );
-    } finally {
-      (dns as { lookup: typeof dns.lookup }).lookup = originalLookup;
+      if (err instanceof SafeFetchError) throw err;
+      throw new SafeFetchError("Could not fetch the target URL.", "connect");
     }
 
     // Manual redirect handling with full re-validation per hop.
     if ([301, 302, 303, 307, 308].includes(response.status)) {
-      const location = response.headers.get("location");
-      await response.body?.cancel().catch(() => undefined);
-      if (!location) throw new SafeFetchError("Redirect without a destination.");
-      if (hop === MAX_REDIRECTS) throw new SafeFetchError("Too many redirects.");
+      const location = response.headers["location"];
+      if (!location) throw new SafeFetchError("Redirect without a destination.", "redirect");
+      if (hop === MAX_REDIRECTS) throw new SafeFetchError("Too many redirects.", "redirect");
       let next: URL;
       try {
         next = new URL(location, current);
       } catch {
-        throw new SafeFetchError("Invalid redirect destination.");
+        throw new SafeFetchError("Invalid redirect destination.", "redirect");
       }
       redirectChain.push(current.toString());
       current = validateTargetUrl(next.toString()); // re-validates scheme/host/port
       continue;
     }
 
-    // Read body with a byte cap.
-    const headers: Record<string, string> = {};
-    response.headers.forEach((v, k) => {
-      headers[k.toLowerCase()] = v;
-    });
-    let truncated = false;
-    let body = "";
-    if (response.body) {
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder("utf-8", { fatal: false });
-      let bytes = 0;
-      try {
-        for (;;) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          bytes += value.byteLength;
-          if (bytes > MAX_RESPONSE_BYTES) {
-            truncated = true;
-            break;
-          }
-          body += decoder.decode(value, { stream: true });
-        }
-        body += decoder.decode();
-      } finally {
-        await reader.cancel().catch(() => undefined);
-      }
-    }
-
     return {
       url: current.toString(),
       status: response.status,
-      headers,
-      body,
+      headers: response.headers,
+      body: response.body,
       redirectChain,
-      truncated,
+      truncated: response.truncated,
     };
   }
-  throw new SafeFetchError("Too many redirects.");
+  throw new SafeFetchError("Too many redirects.", "redirect");
 }
+
+// Exported for tests.
+export const __testHooks = { resolvePublicIps, pinnedRequest };

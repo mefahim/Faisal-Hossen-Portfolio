@@ -90,3 +90,56 @@ test("validateTargetUrl rejects garbage", () => {
   assert.throws(() => validateTargetUrl("not a url"), SafeFetchError);
   assert.throws(() => validateTargetUrl("x".repeat(3000)), SafeFetchError);
 });
+
+// --- pinnedRequest: real HTTP against a local server ---
+
+test("pinnedRequest fetches with pinned DNS and handles redirects", async () => {
+  const http = await import("node:http");
+  const { __testHooks } = await import("../lib/server/health/safe-fetch");
+
+  const server = http.createServer((req, res) => {
+    if (req.url === "/redirect") {
+      res.writeHead(301, { location: "/final" });
+      res.end();
+      return;
+    }
+    res.writeHead(200, { "content-type": "text/html", "x-test": "yes" });
+    res.end("<html><head><title>T</title></head></html>");
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const port = (server.address() as { port: number }).port;
+  try {
+    // Direct fetch with pinned IP (bypasses SSRF layer by design — tests HTTP layer).
+    const ok = await __testHooks.pinnedRequest(new URL(`http://localhost:${port}/`), "127.0.0.1");
+    assert.equal(ok.status, 200);
+    assert.ok(ok.body.includes("<title>T</title>"));
+    assert.equal(ok.headers["x-test"], "yes");
+    assert.equal(ok.truncated, false);
+
+    // Redirect is returned as-is (safeFetch handles hops, pinnedRequest does not follow).
+    const redir = await __testHooks.pinnedRequest(new URL(`http://localhost:${port}/redirect`), "127.0.0.1");
+    assert.equal(redir.status, 301);
+    assert.equal(redir.headers["location"], "/final");
+  } finally {
+    server.close();
+  }
+});
+
+test("pinnedRequest times out on a hanging server", async () => {
+  const http = await import("node:http");
+  const { __testHooks, FETCH_TIMEOUT_MS } = await import("../lib/server/health/safe-fetch");
+  assert.ok(FETCH_TIMEOUT_MS <= 10000, "timeout stays conservative");
+  const server = http.createServer(() => {
+    // Never responds.
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const port = (server.address() as { port: number }).port;
+  try {
+    await assert.rejects(
+      __testHooks.pinnedRequest(new URL(`http://localhost:${port}/`), "127.0.0.1"),
+      /took too long/,
+    );
+  } finally {
+    server.close();
+  }
+});
