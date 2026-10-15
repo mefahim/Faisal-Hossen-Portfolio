@@ -90,7 +90,8 @@ test("buildLeadsQuery escapes LIKE wildcards in search", () => {
 test("buildLeadsQuery combines status and search", () => {
   const q = buildLeadsQuery({ q: "acme", status: "qualified", page: 2, limit: 10 });
   assert.ok(q.whereClause.includes("status = $1"));
-  assert.ok(q.whereClause.includes("ILIKE $2"));
+  assert.ok(q.whereClause.includes("LIKE $2"));
+  assert.ok(!q.whereClause.includes("ILIKE")); // MariaDB has no ILIKE
   assert.ok(q.whereClause.includes(" AND "));
   assert.deepEqual(q.params, ["qualified", "%acme%", 10, 10]);
 });

@@ -20,10 +20,11 @@ export async function GET(request: Request) {
     const params = parseLeadsParams(new URL(request.url).searchParams);
     const { countSql, listSql, params: values } = buildLeadsQuery(params);
     const [countRes, listRes] = await Promise.all([
-      query<{ total: number }>(countSql, values.slice(0, values.length - 2)),
+      query<{ total: number | string }>(countSql, values.slice(0, values.length - 2)),
       query(listSql, values),
     ]);
-    const total = countRes.rows[0]?.total ?? 0;
+    // mysql2 may return COUNT(*) as a string for large counts; coerce safely.
+    const total = Number(countRes.rows[0]?.total ?? 0) || 0;
     return NextResponse.json(
       {
         leads: listRes.rows,

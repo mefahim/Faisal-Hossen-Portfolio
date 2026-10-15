@@ -61,9 +61,11 @@ export function buildLeadsQuery(params: LeadsListParams): LeadsQuery {
   }
   if (params.q) {
     // Escape LIKE wildcards so the search is literal, then wrap for substring match.
+    // NOTE: MariaDB/MySQL has no ILIKE — LIKE with the table's case-insensitive
+    // collation (utf8mb4_*_ci) already matches case-insensitively.
     const escaped = params.q.replace(/[\\%_]/g, (c) => `\\${c}`);
     conditions.push(
-      `(name ILIKE $${idx} ESCAPE '\\' OR email ILIKE $${idx} ESCAPE '\\' OR company ILIKE $${idx} ESCAPE '\\' OR subject ILIKE $${idx} ESCAPE '\\' OR message ILIKE $${idx} ESCAPE '\\')`,
+      `(name LIKE $${idx} ESCAPE '\\' OR email LIKE $${idx} ESCAPE '\\' OR company LIKE $${idx} ESCAPE '\\' OR subject LIKE $${idx} ESCAPE '\\' OR message LIKE $${idx} ESCAPE '\\')`,
     );
     values.push(`%${escaped}%`);
     idx++;
@@ -76,7 +78,8 @@ export function buildLeadsQuery(params: LeadsListParams): LeadsQuery {
     "id,name,email,company,subject,message,status,delivery_status,created_at,updated_at";
   return {
     whereClause,
-    countSql: `SELECT COUNT(*)::int AS total FROM contact_submissions ${whereClause}`,
+    // NOTE: no ::int cast — PostgreSQL-only syntax; MariaDB rejects it.
+    countSql: `SELECT COUNT(*) AS total FROM contact_submissions ${whereClause}`,
     listSql:
       `SELECT ${columns} FROM contact_submissions ${whereClause} ` +
       `ORDER BY created_at DESC LIMIT $${idx++} OFFSET $${idx++}`,
