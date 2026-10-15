@@ -35,7 +35,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const { url } = await buildAuthorizationUrl("ga4");
+    const { url } = await buildAuthorizationUrl("ga4", owner.userId);
     return NextResponse.json({ url }, { headers: noStore });
   } catch (error) {
     if (error instanceof UnauthorizedError) {

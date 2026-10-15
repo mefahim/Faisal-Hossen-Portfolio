@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { getOwnerSession } from "@/lib/server/auth";
-import { consumeOAuthState } from "@/lib/server/analytics/oauth-state";
+import { consumeOAuthState, peekOAuthStateProvider } from "@/lib/server/analytics/oauth-state";
 import { exchangeCodeForTokens, getOAuthConfig, OAuthConfigError } from "@/lib/server/analytics/google-oauth";
 import "@/lib/server/analytics/register-google-oauth";
 import { storeTokens } from "@/lib/server/analytics/tokens";
@@ -27,9 +26,14 @@ const noStore = { "Cache-Control": "private, no-store" } as const;
  * - Token exchange failures never leave partial state.
  */
 
-function dashboardUrl(request: Request, params: URLSearchParams): string {
+/**
+ * Dashboard URL per provider. GA4 flows return to the Analytics page;
+ * Search Console flows return to the Search Console page.
+ */
+function dashboardUrl(request: Request, provider: string, params: URLSearchParams): string {
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, "") ?? new URL(request.url).origin;
-  return `${siteUrl}/faisals-room/analytics?${params.toString()}`;
+  const path = provider === "search_console" ? "/faisals-room/seo/search-console" : "/faisals-room/analytics";
+  return `${siteUrl}${path}?${params.toString()}`;
 }
 
 function clientIp(request: Request): string {
@@ -50,7 +54,7 @@ export async function GET(request: Request) {
     retrySeconds: 0,
   }));
   if (!rate.allowed) {
-    return NextResponse.redirect(dashboardUrl(request, new URLSearchParams({ oauth: "rate_limited" })), {
+    return NextResponse.redirect(dashboardUrl(request, "ga4", new URLSearchParams({ oauth: "rate_limited" })), {
       headers: noStore,
     });
   }
@@ -59,8 +63,9 @@ export async function GET(request: Request) {
   if (error) {
     // User denied consent or Google returned an error. Never reflect the raw
     // error_description (it may contain sensitive context).
+    // Provider is unknown here (no valid state); default to the GA4 dashboard.
     const safeCode = error === "access_denied" ? "denied" : "provider_error";
-    return NextResponse.redirect(dashboardUrl(request, new URLSearchParams({ oauth: safeCode })), {
+    return NextResponse.redirect(dashboardUrl(request, "ga4", new URLSearchParams({ oauth: safeCode })), {
       headers: noStore,
     });
   }
@@ -68,7 +73,18 @@ export async function GET(request: Request) {
   const code = url.searchParams.get("code");
   const state = url.searchParams.get("state");
   if (!code || !state) {
-    return NextResponse.redirect(dashboardUrl(request, new URLSearchParams({ oauth: "invalid_request" })), {
+    return NextResponse.redirect(dashboardUrl(request, "ga4", new URLSearchParams({ oauth: "invalid_request" })), {
+      headers: noStore,
+    });
+  }
+
+  // Discover the provider from the state (ga4 or search_console) so the
+  // single registered redirect URI serves both independent connections.
+  let provider: string;
+  try {
+    provider = await peekOAuthStateProvider(state);
+  } catch {
+    return NextResponse.redirect(dashboardUrl(request, "ga4", new URLSearchParams({ oauth: "invalid_request" })), {
       headers: noStore,
     });
   }
@@ -77,24 +93,28 @@ export async function GET(request: Request) {
     const config = getOAuthConfig();
 
     // Atomic single-use consumption. Throws on unknown/expired/reused/mismatched state.
-    const codeVerifier = await consumeOAuthState(state, "ga4");
+    // The returned ownerId identifies who initiated the flow — no live owner
+    // session is required, so tokens are stored even if the session expired
+    // while the owner was on Google's authorization pages. The unguessable,
+    // single-use state token is the authentication for this callback.
+    const { verifier: codeVerifier, ownerId } = await consumeOAuthState(state, provider);
+    if (!ownerId) {
+      // Legacy states (created before owner tracking) cannot be attributed.
+      console.error(`[${requestId}] OAuth callback completed but state has no owner; tokens discarded.`);
+      return NextResponse.redirect(dashboardUrl(request, provider, new URLSearchParams({ oauth: "session_expired" })), {
+        headers: noStore,
+      });
+    }
 
     // Exchange the authorization code. The code is single-use at Google too.
     const tokens = await exchangeCodeForTokens(code, codeVerifier, config.redirectUri);
 
-    // Persist encrypted tokens. Requires an owner session to attribute the
-    // connection — the person completing the flow must be the owner.
-    // If no owner session exists, we cannot safely attribute the tokens.
-    const owner = await getOwnerSession().catch(() => null);
-    if (!owner) {
-      console.error(`[${requestId}] OAuth callback completed but no owner session; tokens discarded.`);
-      return NextResponse.redirect(dashboardUrl(request, new URLSearchParams({ oauth: "session_expired" })), {
-        headers: noStore,
-      });
-    }
-    await storeTokens("ga4", tokens, owner.userId, undefined, { isRefresh: false });
+    // Persist encrypted tokens, attributed to the owner who initiated the flow.
+    // skipSessionCheck: authorization comes from the consumed single-use state
+    // token (bound to ownerId), not from a live session.
+    await storeTokens(provider, tokens, ownerId, undefined, { isRefresh: false, skipSessionCheck: true });
 
-    return NextResponse.redirect(dashboardUrl(request, new URLSearchParams({ oauth: "connected" })), {
+    return NextResponse.redirect(dashboardUrl(request, provider, new URLSearchParams({ oauth: "connected" })), {
       headers: noStore,
     });
   } catch (err) {
@@ -103,6 +123,6 @@ export async function GET(request: Request) {
     const params = new URLSearchParams({
       oauth: err instanceof OAuthConfigError ? "misconfigured" : "failed",
     });
-    return NextResponse.redirect(dashboardUrl(request, params), { headers: noStore });
+    return NextResponse.redirect(dashboardUrl(request, provider, params), { headers: noStore });
   }
 }

@@ -25,9 +25,11 @@ export default async function AnalyticsPage({
   // Check connection status. If the provider tables don't exist yet
   // (migration not applied), treat as not connected.
   let connected = false;
+  let propertyId: string | null = null;
   try {
     const status = await getConnectionStatus("ga4", owner.userId);
     connected = status !== null;
+    propertyId = status?.propertyId ?? null;
   } catch {
     connected = false;
   }
@@ -49,7 +51,11 @@ export default async function AnalyticsPage({
         <span className="room-published-badge"><span aria-hidden="true" />Private workspace</span>
       </div>
       <AnalyticsDashboardClient
-        initialState={connected ? { kind: "loading" } : { kind: "not_connected", oauth }}
+        initialState={
+          connected
+            ? { kind: "connected", propertyId }
+            : { kind: "not_connected", oauth }
+        }
       />
     </>
   );

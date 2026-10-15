@@ -4,13 +4,37 @@ import { requireOwner, UnauthorizedError } from "@/lib/server/auth";
 import { query, transaction } from "@/lib/server/db";
 import { correlationId, readJsonBody, RequestBodyError, safeErrorMessage, sameOrigin } from "@/lib/server/security";
 import { leadStatusSchema } from "@/lib/server/validation";
+import { buildLeadsQuery, parseLeadsParams } from "@/lib/server/leads";
 
 export const runtime = "nodejs";
-export async function GET() {
+/**
+ * List leads with search, status filter, and pagination.
+ *
+ * Query params: q (search), status (new|reviewing|qualified|won|archived),
+ * page (1-based), limit (default 20, max 100).
+ * Owner-only. No PII in logs.
+ */
+export async function GET(request: Request) {
   try {
     await requireOwner();
-    const rows = await query("SELECT id,name,email,company,subject,message,status,delivery_status,created_at,updated_at FROM contact_submissions ORDER BY created_at DESC LIMIT 500");
-    return NextResponse.json({ leads: rows.rows }, { headers: { "Cache-Control": "private, no-store" } });
+    const params = parseLeadsParams(new URL(request.url).searchParams);
+    const { countSql, listSql, params: values } = buildLeadsQuery(params);
+    const [countRes, listRes] = await Promise.all([
+      query<{ total: number | string }>(countSql, values.slice(0, values.length - 2)),
+      query(listSql, values),
+    ]);
+    // mysql2 may return COUNT(*) as a string for large counts; coerce safely.
+    const total = Number(countRes.rows[0]?.total ?? 0) || 0;
+    return NextResponse.json(
+      {
+        leads: listRes.rows,
+        total,
+        page: params.page,
+        limit: params.limit,
+        totalPages: Math.max(1, Math.ceil(total / params.limit)),
+      },
+      { headers: { "Cache-Control": "private, no-store" } },
+    );
   } catch (error) {
     if (error instanceof UnauthorizedError) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
     return NextResponse.json({ error: safeErrorMessage(error) }, { status: 503 });

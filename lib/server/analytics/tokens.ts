@@ -41,6 +41,23 @@ export function normalizePropertyId(propertyId: string): string {
   return propertyId.startsWith("properties/") ? propertyId.slice("properties/".length) : propertyId;
 }
 
+/**
+ * Validate a Search Console site URL for storage. GSC site URLs are either
+ * full URLs (https://example.com/) or domain properties (sc-domain:example.com).
+ * The route additionally validates the site against Google's live site list;
+ * this is the format-level guard. Exported for tests.
+ */
+export function normalizeSiteUrl(siteUrl: string): string {
+  const trimmed = siteUrl.trim();
+  if (!trimmed || trimmed.length > 64) {
+    throw new Error("Invalid Search Console site URL.");
+  }
+  if (!/^(https?:\/\/|sc-domain:)/i.test(trimmed)) {
+    throw new Error("Invalid Search Console site URL.");
+  }
+  return trimmed;
+}
+
 /** Pure logic: does this token need refresh? (testable without DB) */
 export function needsRefresh(tokenExpiry: Date, now: Date = new Date()): boolean {
   return tokenExpiry.getTime() - now.getTime() < TOKEN_REFRESH_BUFFER_MS;
@@ -239,10 +256,17 @@ export async function storeTokens(
   tokens: TokenSet,
   actorId: string,
   propertyId?: string,
-  options?: { isRefresh?: boolean },
+  options?: { isRefresh?: boolean; skipSessionCheck?: boolean },
 ): Promise<void> {
-  const session = await resolveSession();
-  if (session.userId !== actorId) throw new UnauthorizedError();
+  // Session check: normally the caller must have a live owner session matching
+  // actorId. The OAuth callback skips this because there may be no live session
+  // (expired during the Google flow) — authorization comes from the unguessable
+  // single-use state token consumed before this call, which binds actorId to
+  // the flow initiator.
+  if (!options?.skipSessionCheck) {
+    const session = await resolveSession();
+    if (session.userId !== actorId) throw new UnauthorizedError();
+  }
   requireEncryption();
   assertSupportedProvider(provider);
   const encAccess = encryptToken(tokens.accessToken);
@@ -408,7 +432,7 @@ export async function setPropertyId(provider: string, propertyId: string, actorI
   const session = await resolveSession();
   if (session.userId !== actorId) throw new UnauthorizedError();
   assertSupportedProvider(provider);
-  const normalized = normalizePropertyId(propertyId);
+  const normalized = provider === "search_console" ? normalizeSiteUrl(propertyId) : normalizePropertyId(propertyId);
   const result = await query("UPDATE provider_tokens SET property_id=$1 WHERE provider=$2", [normalized, provider]);
   if (result.rowCount === 0) throw new Error(`Provider '${provider}' is not connected.`);
 }

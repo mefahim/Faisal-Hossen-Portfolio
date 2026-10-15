@@ -62,12 +62,23 @@ test("createOAuthChallenge persists state and consumeOAuthState returns verifier
   assert.notEqual(rows.rows[0].encrypted_verifier, c.codeVerifier);
   assert.ok(!rows.rows[0].encrypted_verifier.includes(c.codeVerifier));
 
-  const verifier = await consumeOAuthState(c.state, "ga4");
-  assert.equal(verifier, c.codeVerifier);
+  const consumed = await consumeOAuthState(c.state, "ga4");
+  assert.equal(consumed.verifier, c.codeVerifier);
+  assert.equal(consumed.ownerId, null); // no owner passed
 
   // Consumed: row is gone.
   const after = await query("SELECT state FROM oauth_states WHERE state=$1", [c.state]);
   assert.equal(after.rowCount, 0);
+});
+
+test("createOAuthChallenge stores ownerId and consumeOAuthState returns it", { skip: !dbAvailable }, async () => {
+  const ownerId = "owner-" + Date.now();
+  const c = await createOAuthChallenge("ga4", ownerId);
+  const rows = await query<{ owner_id: string }>("SELECT owner_id FROM oauth_states WHERE state=$1", [c.state]);
+  assert.equal(rows.rows[0].owner_id, ownerId);
+  const consumed = await consumeOAuthState(c.state, "ga4");
+  assert.equal(consumed.verifier, c.codeVerifier);
+  assert.equal(consumed.ownerId, ownerId);
 });
 
 test("state is single-use (replay rejected)", { skip: !dbAvailable }, async () => {
