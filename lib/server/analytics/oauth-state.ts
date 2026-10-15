@@ -138,6 +138,30 @@ export async function consumeOAuthState(state: string, provider: string): Promis
 }
 
 /**
+ * Peek at the provider stored for an OAuth state without consuming it.
+ *
+ * Used by the shared OAuth callback to discover which provider (ga4 or
+ * search_console) an authorization flow belongs to, so the state can be
+ * consumed with the correct provider and tokens stored against it.
+ * The row is NOT deleted here; consumeOAuthState still enforces single-use.
+ * Throws on unknown/expired state.
+ */
+export async function peekOAuthStateProvider(state: string): Promise<string> {
+  if (!state || typeof state !== "string") {
+    throw new Error("Invalid or expired OAuth state.");
+  }
+  const found = await query<{ provider: string }>(
+    `SELECT provider FROM oauth_states
+     WHERE state=$1 AND expires_at > CURRENT_TIMESTAMP(3)`,
+    [state],
+  );
+  const row = found.rows[0];
+  if (!row) throw new Error("Invalid or expired OAuth state.");
+  assertSupportedProvider(row.provider);
+  return row.provider;
+}
+
+/**
  * Verify that a code challenge matches its verifier (S256).
  * Constant-time comparison of the derived challenge.
  */

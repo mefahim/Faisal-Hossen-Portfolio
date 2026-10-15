@@ -10,7 +10,7 @@ import type { TokenSet } from "./tokens";
  * injectable `TokenExchangeFn` / `TokenRefreshFn` in `tokens.ts`.
  *
  * Security properties:
- * - Only the `analytics.readonly` scope is requested. No write scopes.
+ * - Only read-only scopes are requested. No write scopes.
  * - `access_type=offline` + `prompt=consent` ensure a refresh token is issued.
  * - The redirect URI must exactly match the URI registered in Google Cloud
  *   Console; it is derived from NEXT_PUBLIC_SITE_URL (fail closed if unset).
@@ -22,7 +22,24 @@ import type { TokenSet } from "./tokens";
 export const GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 export const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
 export const GA4_READONLY_SCOPE = "https://www.googleapis.com/auth/analytics.readonly";
+export const GSC_READONLY_SCOPE = "https://www.googleapis.com/auth/webmasters.readonly";
 export const OAUTH_CALLBACK_PATH = "/api/faisals-room/analytics/oauth/callback";
+
+/**
+ * Read-only OAuth scope per provider. GA4 and Search Console use independent
+ * connections with independent tokens (per PHASE-2-PROPOSAL.md).
+ */
+const PROVIDER_SCOPES: Record<string, string> = {
+  ga4: GA4_READONLY_SCOPE,
+  search_console: GSC_READONLY_SCOPE,
+};
+
+/** Resolve the OAuth scope for a provider. Throws for unknown providers. */
+export function scopeForProvider(provider: string): string {
+  const scope = PROVIDER_SCOPES[provider];
+  if (!scope) throw new OAuthConfigError(`No OAuth scope configured for provider '${provider}'.`);
+  return scope;
+}
 
 /** Error thrown when OAuth configuration is missing or invalid. Fails closed. */
 export class OAuthConfigError extends Error {
@@ -81,7 +98,7 @@ export async function buildAuthorizationUrl(provider: string, ownerId?: string):
     client_id: config.clientId,
     redirect_uri: config.redirectUri,
     response_type: "code",
-    scope: GA4_READONLY_SCOPE,
+    scope: scopeForProvider(provider),
     access_type: "offline",
     prompt: "consent",
     state,
