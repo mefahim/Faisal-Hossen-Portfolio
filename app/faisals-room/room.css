@@ -7,3 +7,17 @@
 .room-media-filter-label{display:block;margin:16px 0 6px;font-size:11px;font-weight:600}.room-media-filter,.room-media-metadata-form input{width:100%;border:1px solid #dfe1da;border-radius:6px;padding:8px 10px;background:#fff;color:var(--room-ink);font:11px var(--font-sans),sans-serif}.room-media-filter{max-width:440px}.room-media-metadata-form{display:grid;gap:5px;margin:12px 0;padding:10px;border:1px solid #eceee8;border-radius:6px;background:#fafbf8}.room-media-metadata-form>label,.room-focal-fields label{font-size:10px;font-weight:600}.room-focal-fields{display:grid;grid-template-columns:1fr 1fr;gap:9px}.room-focal-fields label{display:grid;gap:5px}.room-media-footer{flex-wrap:wrap}.room-media-actions{display:flex;align-items:center;justify-content:flex-end;gap:3px;flex-wrap:wrap}.room-media-legacy{font-size:9px;color:#7a7d74}.room-media-metadata-form input:focus,.room-media-filter:focus{outline:3px solid #a9b6a1;outline-offset:1px}
 
 .room-preview-page>h1{font:500 clamp(29px,3.3vw,40px)/1.1 var(--font-display),sans-serif;letter-spacing:-.04em;overflow-wrap:anywhere}
+
+/* Lead inbox + shared dashboard additions (Phase 2) */
+.room-badge{display:inline-flex;align-items:center;border-radius:30px;padding:4px 10px;font-size:10px;font-weight:600;text-transform:capitalize;white-space:nowrap;background:#f0f1ed;color:#676b62}
+.room-badge-info{background:#e8eef5;color:#3d5a80}
+.room-badge-warning{background:#fbf3e2;color:#7a5c22}
+.room-badge-success{background:#edf2eb;color:#426047}
+.room-badge-muted{background:#f0f1ed;color:#8a8e85}
+.room-table{border-collapse:collapse;font-size:12px}
+.room-table th{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:#868980;font-weight:650;padding:10px 12px;border-bottom:1px solid var(--room-line)}
+.room-table td{padding:11px 12px;border-bottom:1px solid #f0f0eb;vertical-align:top}
+.room-table tbody tr:hover{background:#fafbf8}
+.room-table-row-selected{background:#f3f5f0!important}
+.room-input{border:1px solid #dfe1da;border-radius:6px;padding:9px 11px;background:#fff;font:13px var(--font-sans),sans-serif;color:var(--room-ink)}
+.room-input:focus{outline:3px solid #a9b6a1;outline-offset:1px}
